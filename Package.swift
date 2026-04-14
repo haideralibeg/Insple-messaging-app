@@ -33,9 +33,19 @@ let package = Package(
             ]
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", "12.12.0"..<"13.0.0")
+    ],
     targets: [
         .executableTarget(
             name: "AppModule",
+            dependencies: [
+                .product(name: "FirebaseAI", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseAILogic", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseAnalyticsCore", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseAnalyticsIdentitySupport", package: "firebase-ios-sdk")
+            ],
             path: "."
         )
     ]
