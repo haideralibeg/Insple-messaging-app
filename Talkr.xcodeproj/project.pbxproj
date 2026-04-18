@@ -14,6 +14,7 @@
 		2E33729E2F8DEAAD0070638E /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 2E33729D2F8DEAAD0070638E /* FirebaseCore */; };
 		2E3372A02F8DEAAD0070638E /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 2E33729F2F8DEAAD0070638E /* FirebaseFunctions */; };
 		2E3372A22F8DEAAD0070638E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2E3372A12F8DEAAD0070638E /* FirebaseMessaging */; };
+		A25E07252F93199B00001380 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A25E07242F93199B00001380 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 				2E3372A22F8DEAAD0070638E /* FirebaseMessaging in Frameworks */,
 				2E33729A2F8DEAAD0070638E /* FirebaseAppCheck in Frameworks */,
 				2E3372A02F8DEAAD0070638E /* FirebaseFunctions in Frameworks */,
+				A25E07252F93199B00001380 /* FirebaseFirestore in Frameworks */,
 				2E3372982F8DEAAD0070638E /* FirebaseAnalyticsCore in Frameworks */,
 				2E33729C2F8DEAAD0070638E /* FirebaseAuth in Frameworks */,
 			);
@@ -50,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				2E3372722F8DE9BB0070638E /* Talkr */,
+				A25E07232F93198C00001380 /* Frameworks */,
 				2E3372712F8DE9BB0070638E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -60,6 +63,13 @@
 				2E3372702F8DE9BB0070638E /* Talkr.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A25E07232F93198C00001380 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -89,6 +99,7 @@
 				2E33729D2F8DEAAD0070638E /* FirebaseCore */,
 				2E33729F2F8DEAAD0070638E /* FirebaseFunctions */,
 				2E3372A12F8DEAAD0070638E /* FirebaseMessaging */,
+				A25E07242F93199B00001380 /* FirebaseFirestore */,
 			);
 			productName = Talkr;
 			productReference = 2E3372702F8DE9BB0070638E /* Talkr.app */;
@@ -406,6 +417,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2E3372942F8DEAAD0070638E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		A25E07242F93199B00001380 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2E3372942F8DEAAD0070638E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

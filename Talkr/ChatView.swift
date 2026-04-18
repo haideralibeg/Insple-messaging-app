@@ -6,6 +6,11 @@ struct ChatView: View {
     var chat: Chat
     @State private var messageText = ""
     
+    // live up-to-date version of this conversation.
+    var liveChat: Chat {
+        store.chats.first(where: { $0.id == chat.id }) ?? chat
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -58,7 +63,8 @@ struct ChatView: View {
                         .padding(.top, 20)
                         .padding(.bottom, 10)
                     
-                    ForEach(chat.messages) { message in
+                    // use "liveChat" here instead of "chat" so it updates automatically
+                    ForEach(liveChat.messages) { message in
                         HStack(alignment: .bottom, spacing: 8) {
                             if message.isIncoming {
                                 // Mock avatar clustering - always show for now
@@ -89,17 +95,31 @@ struct ChatView: View {
             // Bottom Input
             HStack(spacing: 12) {
                 HStack {
+                    // .onSubmit lets you press "Return" on your keyboard to send
                     TextField("Message...", text: $messageText)
+                        .onSubmit {
+                            sendMessage()
+                        }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(Color(.systemGray6))
                 .cornerRadius(20)
                 
-                Button(action: {}) {
-                    Image(systemName: "photo")
-                        .font(.title2)
-                        .foregroundColor(.gray)
+                // If we typed something, show a Send button.
+                // If it is empty, show the Photo button!
+                if !messageText.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Button(action: sendMessage) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.title2)
+                            .foregroundColor(.black)
+                    }
+                } else {
+                    Button(action: {}) {
+                        Image(systemName: "photo")
+                            .font(.title2)
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             .padding(.horizontal)
@@ -110,5 +130,17 @@ struct ChatView: View {
         .onAppear {
             store.markAsRead(chat)
         }
+    }
+    
+    // what to do when we send a message
+    private func sendMessage() {
+        // 1. Make sure the message isn't just invisible spaces
+        guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        
+        // 2. Hand the message to our Store (the big brain that remembers everything)
+        store.sendMessage(messageText, in: chat)
+        
+        // 3. Erase the text box so it's clean for the next message
+        messageText = ""
     }
 }
