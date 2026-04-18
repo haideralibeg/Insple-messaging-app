@@ -4,9 +4,9 @@ import FirebaseFirestore
 
 /*
  =========================================
- SUMMARY OF CHANGES MADE TODAY:
+ SUMMARY OF CHANGES MADE:
  =========================================
- 1. Connected to Firebase: We imported `FirebaseFirestore` (our Walkie-Talkies) to talk to a real backend database.
+ 1. Connected to Firebase: We imported `FirebaseFirestore` to talk to a real backend database.
  2. Made Messages "Codable": We added `Codable` to `ChatMessage`. This is the "Origami" step that folds our Swift message into a format the Firebase can store.
  3. Built the Send Message Function: We added the `sendMessage` function to `ChatStore`.
     - First, it updates the "Short-Term Memory" (the local array) so the UI updates instantly.
