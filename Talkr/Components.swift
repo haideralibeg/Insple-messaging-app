@@ -1,47 +1,45 @@
 import SwiftUI
 
 struct TopThemeBar: View {
-    var label1: String = "Mode 1"
-    var label2: String = "Mode 2"
-    @State private var isLabel1Selected: Bool = true
-    
+    @EnvironmentObject var theme: ThemeManager
+
     var body: some View {
         HStack {
             HStack(spacing: 12) {
                 Text("Theme")
                     .fontWeight(.bold)
-                
-                Button(action: { isLabel1Selected = true }) {
-                    Text(label1)
+
+                Button(action: { theme.set("genz") }) {
+                    Text(theme.label1)
                         .font(.subheadline)
                         .fontWeight(.bold)
-                        .foregroundColor(isLabel1Selected ? .white : .black)
+                        .foregroundColor(theme.activeMode == "genz" ? .white : .black)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(isLabel1Selected ? Color.black : Color.clear)
+                        .background(theme.activeMode == "genz" ? Color.black : Color.clear)
                         .clipShape(Capsule())
                         .overlay(
-                            Capsule().stroke(Color.black, lineWidth: isLabel1Selected ? 0 : 1)
+                            Capsule().stroke(Color.black, lineWidth: theme.activeMode == "genz" ? 0 : 1)
                         )
                 }
-                
-                Button(action: { isLabel1Selected = false }) {
-                    Text(label2)
+
+                Button(action: { theme.set("nostalgic") }) {
+                    Text(theme.label2)
                         .font(.subheadline)
-                        .foregroundColor(!isLabel1Selected ? .white : .black)
+                        .foregroundColor(theme.activeMode == "nostalgic" ? .white : .black)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .background(!isLabel1Selected ? Color.black : Color.clear)
+                        .background(theme.activeMode == "nostalgic" ? Color.black : Color.clear)
                         .clipShape(Capsule())
                         .overlay(
-                            Capsule().stroke(Color.black, lineWidth: !isLabel1Selected ? 0 : 1)
+                            Capsule().stroke(Color.black, lineWidth: theme.activeMode == "nostalgic" ? 0 : 1)
                         )
                 }
-                
+
                 Button(action: {}) {
                     Image(systemName: "ellipsis")
                         .foregroundColor(.black)
@@ -61,18 +59,18 @@ struct TopThemeBar: View {
 struct AvatarView: View {
     var size: CGFloat = 50
     var showUnreadDot: Bool = false
-    
+
     var body: some View {
         ZStack(alignment: .leading) {
             Circle()
                 .fill(Color.black)
                 .frame(width: size, height: size)
-            
+
             if showUnreadDot {
                 Circle()
                     .fill(Color.red)
                     .frame(width: 8, height: 8)
-                    .offset(x: -16) // Stick out to the left margin
+                    .offset(x: -16)
             }
         }
         .padding(.leading, showUnreadDot ? 16 : 0)
