@@ -15,6 +15,7 @@
 		2E3372A02F8DEAAD0070638E /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 2E33729F2F8DEAAD0070638E /* FirebaseFunctions */; };
 		2E3372A22F8DEAAD0070638E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2E3372A12F8DEAAD0070638E /* FirebaseMessaging */; };
 		A25E07252F93199B00001380 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A25E07242F93199B00001380 /* FirebaseFirestore */; };
+		B5DE2C3D2F96E24600F46EDC /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = B5DE2C3C2F96E24600F46EDC /* FirebaseDatabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 				2E33729A2F8DEAAD0070638E /* FirebaseAppCheck in Frameworks */,
 				2E3372A02F8DEAAD0070638E /* FirebaseFunctions in Frameworks */,
 				A25E07252F93199B00001380 /* FirebaseFirestore in Frameworks */,
+				B5DE2C3D2F96E24600F46EDC /* FirebaseDatabase in Frameworks */,
 				2E3372982F8DEAAD0070638E /* FirebaseAnalyticsCore in Frameworks */,
 				2E33729C2F8DEAAD0070638E /* FirebaseAuth in Frameworks */,
 			);
@@ -100,6 +102,7 @@
 				2E33729F2F8DEAAD0070638E /* FirebaseFunctions */,
 				2E3372A12F8DEAAD0070638E /* FirebaseMessaging */,
 				A25E07242F93199B00001380 /* FirebaseFirestore */,
+				B5DE2C3C2F96E24600F46EDC /* FirebaseDatabase */,
 			);
 			productName = Talkr;
 			productReference = 2E3372702F8DE9BB0070638E /* Talkr.app */;
@@ -422,6 +425,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2E3372942F8DEAAD0070638E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		B5DE2C3C2F96E24600F46EDC /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2E3372942F8DEAAD0070638E /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
