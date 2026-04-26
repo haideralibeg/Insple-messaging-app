@@ -73,13 +73,44 @@ class ChatStore: ObservableObject {
     @Published var chats: [Chat] = mockChats
 
     private let db = Firestore.firestore()
-
+    
+    // Update chat status with DB
+    private func updateMessages(_ messages: [ChatMessage], for chat: Chat) {
+        guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+            chats[idx].messages = messages
+    }
+    
+    // listen for new messages from DB, called when opening a chat
+    func listenForMessages(in chat: Chat){
+        db.collection("chats")
+            .document(chat.id.uuidString)
+            .collection("messages")
+            .order(by: "timestamp")
+            .addSnapshotListener{ [weak self] snapshot, error in
+                guard let documents = snapshot?.documents else {
+                    print("Error fetching messages: \(error?.localizedDescription ?? "Unknown")")
+                    return
+                }
+                do {
+                    let messages = try documents.compactMap {
+                        try $0.data(as: ChatMessage.self)
+                    }
+                    
+                    DispatchQueue.main.async {
+                        self?.updateMessages(messages, for: chat)
+                    }
+                } catch{
+                    print("Decoding error: \(error)")
+                }
+            }
+    }
+    
     func markAsRead(_ chat: Chat) {
         if let idx = chats.firstIndex(where: { $0.id == chat.id }) {
             chats[idx].isUnread = false
         }
     }
-
+    
     func sendMessage(_ text: String, in chat: Chat) {
         guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
 
