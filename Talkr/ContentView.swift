@@ -1,21 +1,20 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var isLoggedIn = false
-    @StateObject private var store = ChatStore()
+    @EnvironmentObject var auth: AuthService
     
     var body: some View {
         Group {
-            if isLoggedIn {
+            if auth.isAuthenticated {
                 NavigationStack {
-                    InboxView(isLoggedIn: $isLoggedIn)
+                    InboxView()
                 }
-                .environmentObject(store)
             } else {
-                OnboardingView(isLoggedIn: $isLoggedIn)
+                // The $ creates a perfect 2-way connection to the Auth manager!
+                OnboardingView(isLoggedIn: $auth.isAuthenticated)
             }
         }
-        .animation(.easeInOut, value: isLoggedIn)
+        // This makes the screen slide nicely when the value changes
+        .animation(.easeInOut, value: auth.isAuthenticated)
     }
 }
-

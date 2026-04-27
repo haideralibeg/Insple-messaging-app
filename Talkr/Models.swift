@@ -1,33 +1,45 @@
+/*
+ =========================================
+ FILE: Models.swift
+ 
+ SUMMARY:
+ Contains the core data structures (User, Chat, ChatMessage) and the primary
+ state managers (ChatStore, AuthService) that handle the connection between the
+ SwiftUI interface and the Firebase backend.
+ 
+ CHANGES IN THIS SESSION:
+ - Made `User` and `ChatMessage` Codable to save to Firebase.
+ - Changed `id` fields from UUID to String to match Firebase ID constraints.
+ - Added `fetchContacts()` to pull real users from the Firestore directory.
+ - Added `getOrCreateChat()` to dynamically generate unique 1-on-1 room IDs based on User UIDs.
+ - Implemented Firestore `SnapshotListeners` for real-time two-way syncing.
+ - Wired `AuthService` directly to Firebase Authentication for live session tracking.
+ =========================================
+ */
+
 import Foundation
-import Combine
-import FirebaseFirestore
+internal import Combine
+import FirebaseFirestore 
+import FirebaseAuth 
 
-// MARK: - Firestore User Model (used by AuthService)
-struct TalkrUser: Codable, Identifiable {
-    @DocumentID var id: String?
-    var phoneNumber: String
-    var displayName: String
-    var activeMode:  String      // "genz" | "nostalgic"
-    var createdAt:   Timestamp
-}
-
-// MARK: - UI Models (used by ChatStore and Views)
-struct User: Identifiable, Hashable {
-    let id = UUID()
+// 1. Made User Codable so we can save profiles to Firebase
+struct User: Identifiable, Hashable, Codable {
+    var id: String
     let name: String
-    let avatarDetails: String? = nil
+    var displayName: String { name } 
+    var avatarDetails: String? = nil
 }
 
 struct ChatMessage: Identifiable, Hashable, Codable {
-    let id: UUID
-    let senderId: UUID
+    var id: String = UUID().uuidString
+    let senderId: String
     let content: String
     let timestamp: Date
-    let isIncoming: Bool
+    var isIncoming: Bool 
 }
 
 struct Chat: Identifiable, Hashable {
-    let id = UUID()
+    var id: String
     let partner: User
     var lastMessage: String
     var timeAgo: String
@@ -35,74 +47,51 @@ struct Chat: Identifiable, Hashable {
     var messages: [ChatMessage]
 }
 
-// MARK: - Mock Data (kept for UI demo purposes)
-let mockMe    = User(name: "Me")
-let mockJohn  = User(name: "John, Smith")
-let mockKyle  = User(name: "Kyle, Gordon")
-let mockJean  = User(name: "Jean, Lee")
-let mockCasey = User(name: "Casey, Brown")
-let mockTaylor = User(name: "Taylor, Morgan")
-let mockChris = User(name: "Chris, Johnson")
-let mockSam   = User(name: "Sam, Taylor")
-let mockAlex  = User(name: "Alex, Guy")
-
-let mockContacts: [User] = [
-    mockJohn, mockKyle, mockJean, mockCasey,
-    mockTaylor, mockChris, mockSam, mockAlex
-]
-
-var mockChats: [Chat] = [
-    Chat(partner: mockJohn, lastMessage: "Maybe next time though!", timeAgo: "10m", isUnread: true, messages: [
-        ChatMessage(id: UUID(), senderId: mockMe.id,   content: "Did you hear the news with AJ",               timestamp: Date(), isIncoming: false),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "No??",                                         timestamp: Date(), isIncoming: true),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "What happened?",                               timestamp: Date(), isIncoming: true),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "Wait was it Sara?",                            timestamp: Date(), isIncoming: true),
-        ChatMessage(id: UUID(), senderId: mockMe.id,   content: "Nah not at all lmao",                         timestamp: Date(), isIncoming: false),
-        ChatMessage(id: UUID(), senderId: mockMe.id,   content: "it was something at the concert last night",   timestamp: Date(), isIncoming: false),
-        ChatMessage(id: UUID(), senderId: mockMe.id,   content: "apparently they were giving out free shirts",  timestamp: Date(), isIncoming: false),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "Aw sick!",                                     timestamp: Date(), isIncoming: true),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "Yeah I would've gone but not my scene",        timestamp: Date(), isIncoming: true),
-        ChatMessage(id: UUID(), senderId: mockJohn.id, content: "Maybe next time though!",                      timestamp: Date(), isIncoming: true)
-    ]),
-    Chat(partner: mockKyle, lastMessage: "All good! Sorry I mis...", timeAgo: "1d", isUnread: false, messages: []),
-    Chat(partner: mockJean, lastMessage: "Did you see that bird??",   timeAgo: "2d", isUnread: true,  messages: [])
-]
-
-// MARK: - ChatStore
+// MARK: - App State & Managers
 class ChatStore: ObservableObject {
-    @Published var chats: [Chat] = mockChats
-
-    private let db = Firestore.firestore()
+    @Published var chats: [Chat] = [] // Empty for now, will populate as you chat!
+    @Published var contacts: [User] = [] // We will store REAL users here
     
-    // Update chat status with DB
-    private func updateMessages(_ messages: [ChatMessage], for chat: Chat) {
-        guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
-            chats[idx].messages = messages
+    private let db = Firestore.firestore()
+    private var activeListener: ListenerRegistration?
+    
+    // FETCH REAL USERS FROM DIRECTORY
+    func fetchContacts() {
+        db.collection("users").addSnapshotListener { snapshot, error in
+            guard let docs = snapshot?.documents else { return }
+            let currentUserId = Auth.auth().currentUser?.uid ?? ""
+            
+            self.contacts = docs.compactMap { doc in
+                guard let user = try? doc.data(as: User.self) else { return nil }
+                // We hide "yourself" from the contacts list
+                if user.id == currentUserId { return nil }
+                return user
+            }
+        }
     }
     
-    // listen for new messages from DB, called when opening a chat
-    func listenForMessages(in chat: Chat){
-        db.collection("chats")
-            .document(chat.id.uuidString)
-            .collection("messages")
-            .order(by: "timestamp")
-            .addSnapshotListener{ [weak self] snapshot, error in
-                guard let documents = snapshot?.documents else {
-                    print("Error fetching messages: \(error?.localizedDescription ?? "Unknown")")
-                    return
-                }
-                do {
-                    let messages = try documents.compactMap {
-                        try $0.data(as: ChatMessage.self)
-                    }
-                    
-                    DispatchQueue.main.async {
-                        self?.updateMessages(messages, for: chat)
-                    }
-                } catch{
-                    print("Decoding error: \(error)")
-                }
-            }
+    // GENERATE 1-ON-1 ROOM
+    func getOrCreateChat(with partner: User) -> Chat {
+        let currentUserId = Auth.auth().currentUser?.uid ?? "me"
+        
+        // Magic: Sort the two IDs alphabetically. 
+        // Whether UserA taps UserB, or UserB taps UserA, the Room ID is EXACTLY the same!
+        let roomId = [currentUserId, partner.id].sorted().joined(separator: "_")
+        
+        // If it's already in the inbox, open it
+        if let existingChat = chats.first(where: { $0.id == roomId }) {
+            return existingChat
+        }
+        
+        // Otherwise, create a fresh chat
+        let newChat = Chat(id: roomId, partner: partner, lastMessage: "Start of chat", timeAgo: "", isUnread: false, messages: [])
+        
+        // Put it in the Inbox so you can see it on the home screen
+        DispatchQueue.main.async {
+            self.chats.insert(newChat, at: 0)
+        }
+        
+        return newChat
     }
     
     func markAsRead(_ chat: Chat) {
@@ -111,35 +100,84 @@ class ChatStore: ObservableObject {
         }
     }
     
+    func startListening(to chat: Chat) {
+        stopListening()
+        let messagesRef = db.collection("chats")
+            .document(chat.id)
+            .collection("messages")
+            .order(by: "timestamp", descending: false)
+        
+        activeListener = messagesRef.addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self, let documents = snapshot?.documents else { return }
+            let currentUserId = Auth.auth().currentUser?.uid ?? ""
+            
+            let liveMessages = documents.compactMap { doc -> ChatMessage? in
+                guard var msg = try? doc.data(as: ChatMessage.self) else { return nil }
+                msg.isIncoming = (msg.senderId != currentUserId)
+                return msg
+            }
+            
+            DispatchQueue.main.async {
+                if let idx = self.chats.firstIndex(where: { $0.id == chat.id }) {
+                    if !liveMessages.isEmpty {
+                        self.chats[idx].messages = liveMessages
+                    }
+                }
+            }
+        }
+    }
+    
+    func stopListening() {
+        activeListener?.remove()
+        activeListener = nil
+    }
+    
     func sendMessage(_ text: String, in chat: Chat) {
         guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
-
-        let newMessage = ChatMessage(
-            id: UUID(),
-            senderId: mockMe.id,
-            content: text,
-            timestamp: Date(),
-            isIncoming: false
-        )
-
-        // Update local state instantly
-        chats[idx].messages.append(newMessage)
-        chats[idx].lastMessage = text
-        chats[idx].timeAgo = "Now"
-
-        // Bubble conversation to top of inbox
-        let updated = chats.remove(at: idx)
-        chats.insert(updated, at: 0)
-
-        // Persist to Firebase
+        let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        
+        let newMessage = ChatMessage(id: UUID().uuidString, senderId: currentUserId, content: text, timestamp: Date(), isIncoming: false)
+        
         do {
-            try db.collection("chats")
-                  .document(chat.id.uuidString)
-                  .collection("messages")
-                  .document(newMessage.id.uuidString)
-                  .setData(from: newMessage)
+            try db.collection("chats").document(chat.id).collection("messages").document(newMessage.id).setData(from: newMessage)
+            
+            DispatchQueue.main.async {
+                self.chats[idx].lastMessage = text
+                self.chats[idx].timeAgo = "Now"
+                let updatedChat = self.chats.remove(at: idx)
+                self.chats.insert(updatedChat, at: 0)
+            }
         } catch {
-            print("Failed to save message: \(error.localizedDescription)")
+            print("Failed to save message: \(error)")
         }
+    }
+}
+
+class ThemeManager: ObservableObject { }
+
+class AuthService: ObservableObject {
+    @Published var currentUser: User? = nil
+    @Published var isAuthenticated: Bool = false
+    private var authListener: AuthStateDidChangeListenerHandle?
+    
+    init() {
+        authListener = Auth.auth().addStateDidChangeListener { [weak self] auth, user in
+            if let user = user {
+                // We use their Email or Phone as their display name for now
+                let newUser = User(id: user.uid, name: user.email ?? user.phoneNumber ?? "Unknown")
+                self?.currentUser = newUser
+                self?.isAuthenticated = true
+                
+                // SAVE TO DIRECTORY SO OTHERS CAN FIND THEM!
+                try? Firestore.firestore().collection("users").document(user.uid).setData(from: newUser)
+            } else {
+                self?.currentUser = nil
+                self?.isAuthenticated = false
+            }
+        }
+    }
+    
+    func logout() {
+        try? Auth.auth().signOut()
     }
 }

@@ -56,37 +56,50 @@ struct ChatView: View {
             
             // Chat Array
             ScrollView {
-                VStack(spacing: 8) {
-                    Text("Jan 01, 2028, 9:41 AM")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.top, 20)
-                        .padding(.bottom, 10)
-                    
-                    // use "liveChat" here instead of "chat" so it updates automatically
-                    ForEach(liveChat.messages) { message in
-                        HStack(alignment: .bottom, spacing: 8) {
-                            if message.isIncoming {
-                                // Mock avatar clustering - always show for now
-                                Circle()
-                                    .fill(Color.black)
-                                    .frame(width: 24, height: 24)
-                            } else {
-                                Spacer()
+                // ScrollViewReader will eventually let us auto-scroll to the bottom!
+                ScrollViewReader { proxy in
+                    VStack(spacing: 8) {
+                        Text("Jan 01, 2028, 9:41 AM")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.top, 20)
+                            .padding(.bottom, 10)
+                        
+                        // use "liveChat" here instead of "chat" so it updates automatically
+                        ForEach(liveChat.messages) { message in
+                            HStack(alignment: .bottom, spacing: 8) {
+                                if message.isIncoming {
+                                    // Mock avatar clustering - always show for now
+                                    Circle()
+                                        .fill(Color.black)
+                                        .frame(width: 24, height: 24)
+                                } else {
+                                    Spacer()
+                                }
+                                
+                                Text(message.content)
+                                    .foregroundColor(message.isIncoming ? .black : .white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(message.isIncoming ? Color(.systemGray5) : Color.black)
+                                    .cornerRadius(20)
+                                
+                                if message.isIncoming {
+                                    Spacer()
+                                }
                             }
-                            
-                            Text(message.content)
-                                .foregroundColor(message.isIncoming ? .black : .white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .background(message.isIncoming ? Color(.systemGray5) : Color.black)
-                                .cornerRadius(20)
-                            
-                            if message.isIncoming {
-                                Spacer()
+                            .padding(.horizontal)
+                            // Attach an ID so we can scroll to it
+                            .id(message.id)
+                        }
+                    }
+                    .onChange(of: liveChat.messages.count) { _ in
+                        // Auto-scroll to the bottom when a new message comes in
+                        if let lastMessage = liveChat.messages.last {
+                            withAnimation {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
                             }
                         }
-                        .padding(.horizontal)
                     }
                 }
             }
@@ -129,18 +142,17 @@ struct ChatView: View {
         .navigationBarHidden(true)
         .onAppear {
             store.markAsRead(chat)
+            store.startListening(to: chat) // Start live syncing!
+        }
+        .onDisappear {
+            store.stopListening() // Stop syncing when we leave
         }
     }
     
     // what to do when we send a message
     private func sendMessage() {
-        // 1. Make sure the message isn't just invisible spaces
         guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        
-        // 2. Hand the message to our Store (the big brain that remembers everything)
         store.sendMessage(messageText, in: chat)
-        
-        // 3. Erase the text box so it's clean for the next message
         messageText = ""
     }
 }
