@@ -11,7 +11,7 @@ struct ContentView: View {
                 }
             } else {
                 // The $ creates a perfect 2-way connection to the Auth manager!
-                OnboardingView(isLoggedIn: $auth.isAuthenticated)
+                OnboardingView()
             }
         }
         // This makes the screen slide nicely when the value changes

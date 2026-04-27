@@ -9,6 +9,8 @@ struct InboxView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
+            theme.backgroundColor.ignoresSafeArea()
+
             VStack(alignment: .leading, spacing: 16) {
                 TopThemeBar()
 
@@ -21,17 +23,15 @@ struct InboxView: View {
 
                 if selectedTab == "Messages" {
                     HStack {
-                        filterButton("All",    active: !unreadFilter) { unreadFilter = false }
-                        filterButton("Unread", active:  unreadFilter) { unreadFilter = true  }
-
+                        filterPill("All",    active: !unreadFilter) { unreadFilter = false }
+                        filterPill("Unread", active:  unreadFilter) { unreadFilter = true  }
                         Spacer()
-
                         NavigationLink(destination: ContactsView()) {
                             Image(systemName: "plus")
                                 .font(.footnote)
-                                .foregroundColor(.black)
+                                .foregroundColor(theme.secondaryTextColor)
                                 .padding(10)
-                                .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                                .overlay(Circle().stroke(theme.secondaryTextColor.opacity(0.3), lineWidth: 1))
                         }
                     }
                     .padding(.horizontal)
@@ -55,70 +55,78 @@ struct InboxView: View {
                 }
             }
 
-            // FAB — shows user initial, tapping logs out
+            // FAB
             Button(action: { auth.logout() }) {
                 Text(auth.currentUser?.displayName.prefix(1).uppercased() ?? "Me")
-                    .font(.headline).fontWeight(.bold).foregroundColor(.white)
+                    .font(.headline).fontWeight(.bold)
+                    .foregroundColor(theme.primaryTextColor)
                     .frame(width: 56, height: 56)
-                    .background(Color.black)
+                    .background(theme.primaryColor)
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 5)
+                    .shadow(color: theme.primaryColor.opacity(0.4), radius: 5, x: 0, y: 5)
             }
             .padding()
         }
         .navigationBarHidden(true)
+        .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
     }
 
     @ViewBuilder
     private func tabButton(_ title: String) -> some View {
         Button(action: { selectedTab = title }) {
             Text(title)
-                .font(.title2)
+                .font(theme.tabFont)
                 .fontWeight(selectedTab == title ? .bold : .medium)
-                .foregroundColor(.black)
+                .foregroundColor(selectedTab == title ? theme.secondaryTextColor : theme.secondaryTextColor.opacity(0.4))
         }
     }
 
     @ViewBuilder
-    private func filterButton(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func filterPill(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline)
-                .foregroundColor(active ? .white : .black)
+                .foregroundColor(active ? theme.primaryTextColor : theme.secondaryTextColor)
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(active ? Color.black : Color.clear)
+                .background(active ? theme.primaryColor : Color.clear)
                 .clipShape(Capsule())
+                .overlay(Capsule().stroke(active ? Color.clear : theme.secondaryTextColor.opacity(0.2), lineWidth: 1))
         }
     }
 }
 
 struct ChatRow: View {
+    @EnvironmentObject var theme: ThemeManager
     var chat: Chat
 
     var body: some View {
         HStack(spacing: 12) {
-            AvatarView(size: 50, showUnreadDot: chat.isUnread)
-                .padding(.leading, chat.isUnread ? 16 : 32)
+            Circle()
+                .fill(chat.isUnread ? theme.unreadDotColor : Color.clear)
+                .frame(width: 8, height: 8)
+                .padding(.leading, 8)
+
+            AvatarView(size: 50, showUnreadDot: false)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .bottom, spacing: 6) {
-                    Text(chat.partner.name.components(separatedBy: ",").first
-                         ?? chat.partner.name)
+                    Text(chat.partner.name.components(separatedBy: ",").first ?? chat.partner.name)
                         .font(.headline)
                         .fontWeight(chat.isUnread ? .bold : .semibold)
-                        .foregroundColor(.black)
+                        .foregroundColor(theme.secondaryTextColor)
                     Text(chat.timeAgo)
                         .font(.subheadline)
-                        .foregroundColor(Color(.systemGray3))
+                        .foregroundColor(theme.secondaryTextColor.opacity(0.4))
                 }
                 Text(chat.lastMessage)
                     .font(.subheadline)
-                    .foregroundColor(Color(.systemGray))
+                    .foregroundColor(theme.secondaryTextColor.opacity(0.6))
                     .lineLimit(1)
             }
             Spacer()
         }
         .padding(.vertical, 12)
-        .background(Color.white)
+        .background(theme.backgroundColor)
+        .overlay(Divider().background(theme.subtleColor), alignment: .bottom)
     }
 }

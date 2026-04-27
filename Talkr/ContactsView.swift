@@ -17,93 +17,100 @@ import SwiftUI
 
 struct ContactsView: View {
     @Environment(\.presentationMode) var presentationMode
-    @EnvironmentObject var store: ChatStore // Added access to our live data!
-    
+    @EnvironmentObject var store: ChatStore
+    @EnvironmentObject var theme: ThemeManager
     @State private var searchText = ""
-    let alphabet: [String] = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "#"]
-    
+
+    let alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
+                    "N","O","P","Q","R","S","T","U","V","W","X","Y","Z","#"]
+
+    var filteredContacts: [User] {
+        searchText.isEmpty ? store.contacts : store.contacts.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .center, spacing: 16) {
-                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                        Image(systemName: "chevron.left")
-                            .font(.title2)
-                            .foregroundColor(.black)
+        ZStack {
+            theme.backgroundColor.ignoresSafeArea()
+
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .center, spacing: 16) {
+                        Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                            Image(systemName: "chevron.left")
+                                .font(.title2)
+                                .foregroundColor(theme.secondaryTextColor)
+                        }
+                        .padding(.leading)
+                        TopThemeBar()
                     }
-                    .padding(.leading)
-                    
-                    TopThemeBar()
-                }
-                
-                Text("Contacts")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.horizontal)
-                
-                HStack {
+
+                    Text("Contacts")
+                        .font(.largeTitle).fontWeight(.bold)
+                        .foregroundColor(theme.secondaryTextColor)
+                        .padding(.horizontal)
+
                     HStack {
-                        Image(systemName: "magnifyingglass").foregroundColor(.gray)
-                        TextField("Search", text: $searchText)
-                        Image(systemName: "mic.fill").foregroundColor(.gray)
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(theme.secondaryTextColor.opacity(0.5))
+                            TextField("Search", text: $searchText)
+                                .foregroundColor(theme.secondaryTextColor)
+                            Image(systemName: "mic.fill")
+                                .foregroundColor(theme.secondaryTextColor.opacity(0.5))
+                        }
+                        .padding(.vertical, 10).padding(.horizontal, 12)
+                        .background(theme.subtleColor)
+                        .clipShape(Capsule())
+
+                        Button(action: {}) {
+                            Image(systemName: "plus")
+                                .font(.footnote)
+                                .foregroundColor(theme.secondaryTextColor)
+                                .padding(10)
+                                .overlay(Circle().stroke(theme.secondaryTextColor.opacity(0.3), lineWidth: 1))
+                        }
+                        .padding(.leading, 8)
                     }
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 12)
-                    .background(Color(.systemGray6))
-                    .clipShape(Capsule())
-                    
-                    Button(action: {}) {
-                        Image(systemName: "plus")
-                            .font(.footnote)
-                            .foregroundColor(.black)
-                            .padding(10)
-                            .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 1))
-                    }
-                    .padding(.leading, 8)
-                }
-                .padding(.horizontal)
-                
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        // WE NOW LOOP OVER REAL USERS!
-                        ForEach(store.contacts) { contact in
-                            
-                            // WHEN YOU TAP A CONTACT, WE OPEN A LIVE CHAT ROOM WITH THEM
-                            NavigationLink(destination: ChatView(chat: store.getOrCreateChat(with: contact))) {
-                                HStack(spacing: 16) {
-                                    AvatarView(size: 50, showUnreadDot: false)
-                                    
-                                    Text(contact.name) // This will show their email/phone!
-                                        .font(.headline)
-                                        .foregroundColor(.black)
-                                    
-                                    Spacer()
+                    .padding(.horizontal)
+
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredContacts) { contact in
+                                NavigationLink(destination: ChatView(chat: store.getOrCreateChat(with: contact))) {
+                                    HStack(spacing: 16) {
+                                        AvatarView(size: 50, showUnreadDot: false)
+                                        Text(contact.name)
+                                            .font(.headline)
+                                            .foregroundColor(theme.secondaryTextColor)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 12).padding(.horizontal)
+                                    .background(theme.backgroundColor)
+                                    .overlay(Divider().background(theme.subtleColor), alignment: .bottom)
                                 }
-                                .padding(.vertical, 12)
-                                .padding(.horizontal)
-                                .background(Color.white)
+                                .buttonStyle(PlainButtonStyle())
                             }
-                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                 }
-            }
-            
-            VStack(spacing: 2) {
-                Spacer()
-                ForEach(alphabet, id: \.self) { letter in
-                    Text(letter)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.gray)
+
+                // Alphabet index
+                VStack(spacing: 2) {
+                    Spacer()
+                    ForEach(alphabet, id: \.self) { letter in
+                        Text(letter)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(theme.secondaryTextColor.opacity(0.4))
+                    }
+                    Spacer()
                 }
-                Spacer()
+                .padding(.trailing, 8).padding(.vertical)
             }
-            .padding(.trailing, 8)
-            .padding(.vertical)
         }
         .navigationBarHidden(true)
-        .onAppear {
-            store.fetchContacts() // Fetch real users when screen opens
-        }
+        .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
+        .onAppear { store.fetchContacts() }
     }
 }
