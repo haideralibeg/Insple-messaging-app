@@ -15,8 +15,8 @@ struct TalkrApp: App { // (If your file is named differently, keep your original
     
     // 1. We create the managers right when the app turns on
     @StateObject private var chatStore = ChatStore()
-    @StateObject private var authService = AuthService()
-    @StateObject private var themeManager = ThemeManager()
+    @StateObject private var authService = AuthService.shared
+    @StateObject private var themeManager = ThemeManager.shared
     
     var body: some Scene {
         WindowGroup {

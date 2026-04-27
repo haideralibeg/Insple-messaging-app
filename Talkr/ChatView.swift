@@ -3,153 +3,138 @@ import SwiftUI
 struct ChatView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var store: ChatStore
+    @EnvironmentObject var theme: ThemeManager
     var chat: Chat
     @State private var messageText = ""
-    
-    // live up-to-date version of this conversation.
+
     var liveChat: Chat {
         store.chats.first(where: { $0.id == chat.id }) ?? chat
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 16) {
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.title2)
-                        .foregroundColor(.black)
+                        .foregroundColor(theme.secondaryTextColor)
                 }
-                
+
                 AvatarView(size: 40, showUnreadDot: false)
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(chat.partner.name.components(separatedBy: ",").first ?? chat.partner.name)
-                        .font(.headline)
-                        .fontWeight(.bold)
+                        .font(.headline).fontWeight(.bold)
+                        .foregroundColor(theme.secondaryTextColor)
                     Text("Active 10m ago")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(theme.secondaryTextColor.opacity(0.5))
                 }
-                
+
                 Spacer()
-                
+
                 HStack(spacing: 20) {
                     Button(action: {}) {
                         Image(systemName: "phone")
                             .font(.title3)
-                            .foregroundColor(.black)
+                            .foregroundColor(theme.secondaryTextColor)
                     }
                     Button(action: {}) {
                         Image(systemName: "video")
                             .font(.title3)
-                            .foregroundColor(.black)
+                            .foregroundColor(theme.secondaryTextColor)
                     }
                 }
             }
             .padding(.horizontal)
             .padding(.top, 10)
             .padding(.bottom, 16)
-            .background(Color.white)
-            
-            // Chat Array
+            .background(theme.backgroundColor)
+
+            // Messages
             ScrollView {
-                // ScrollViewReader will eventually let us auto-scroll to the bottom!
                 ScrollViewReader { proxy in
                     VStack(spacing: 8) {
                         Text("Jan 01, 2028, 9:41 AM")
                             .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.top, 20)
-                            .padding(.bottom, 10)
-                        
-                        // use "liveChat" here instead of "chat" so it updates automatically
+                            .foregroundColor(theme.secondaryTextColor.opacity(0.4))
+                            .padding(.top, 20).padding(.bottom, 10)
+
                         ForEach(liveChat.messages) { message in
                             HStack(alignment: .bottom, spacing: 8) {
                                 if message.isIncoming {
-                                    // Mock avatar clustering - always show for now
                                     Circle()
-                                        .fill(Color.black)
+                                        .fill(theme.primaryColor)
                                         .frame(width: 24, height: 24)
                                 } else {
                                     Spacer()
                                 }
-                                
+
                                 Text(message.content)
-                                    .foregroundColor(message.isIncoming ? .black : .white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(message.isIncoming ? Color(.systemGray5) : Color.black)
+                                    .foregroundColor(message.isIncoming
+                                        ? theme.secondaryTextColor
+                                        : theme.primaryTextColor)
+                                    .padding(.horizontal, 16).padding(.vertical, 10)
+                                    .background(message.isIncoming
+                                        ? theme.incomingBubbleColor
+                                        : theme.outgoingBubbleColor)
                                     .cornerRadius(20)
-                                
+
                                 if message.isIncoming {
                                     Spacer()
                                 }
                             }
                             .padding(.horizontal)
-                            // Attach an ID so we can scroll to it
                             .id(message.id)
                         }
                     }
                     .onChange(of: liveChat.messages.count) { _ in
-                        // Auto-scroll to the bottom when a new message comes in
-                        if let lastMessage = liveChat.messages.last {
-                            withAnimation {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
+                        if let last = liveChat.messages.last {
+                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
                     }
                 }
             }
-            .background(Color.white)
-            
-            // Bottom Input
+            .background(theme.backgroundColor)
+
+            // Input bar
             HStack(spacing: 12) {
                 HStack {
-                    // .onSubmit lets you press "Return" on your keyboard to send
                     TextField("Message...", text: $messageText)
-                        .onSubmit {
-                            sendMessage()
-                        }
+                        .foregroundColor(theme.secondaryTextColor)
+                        .onSubmit { sendMessage() }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(.systemGray6))
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .background(theme.subtleColor)
                 .cornerRadius(20)
-                
-                // If we typed something, show a Send button.
-                // If it is empty, show the Photo button!
+
                 if !messageText.trimmingCharacters(in: .whitespaces).isEmpty {
                     Button(action: sendMessage) {
                         Image(systemName: "paperplane.fill")
                             .font(.title2)
-                            .foregroundColor(.black)
+                            .foregroundColor(theme.outgoingBubbleColor)
                     }
                 } else {
                     Button(action: {}) {
                         Image(systemName: "photo")
                             .font(.title2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(theme.secondaryTextColor.opacity(0.5))
                     }
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background(Color.white)
+            .padding(.horizontal).padding(.vertical, 10)
+            .background(theme.backgroundColor)
         }
         .navigationBarHidden(true)
+        .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
         .onAppear {
             store.markAsRead(chat)
-            store.startListening(to: chat) // Start live syncing!
+            store.startListening(to: chat)
         }
-        .onDisappear {
-            store.stopListening() // Stop syncing when we leave
-        }
+        .onDisappear { store.stopListening() }
     }
-    
-    // what to do when we send a message
+
     private func sendMessage() {
         guard !messageText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         store.sendMessage(messageText, in: chat)
