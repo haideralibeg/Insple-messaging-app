@@ -1,5 +1,5 @@
 import Foundation
-internal import Combine
+import Combine
 import FirebaseFirestore 
 
 /*
@@ -18,6 +18,15 @@ struct User: Identifiable, Hashable {
     let id = UUID()
     let name: String
     let avatarDetails: String? = nil
+}
+
+// The authenticated user's profile, stored in Firestore at "users/{uid}"
+struct TalkrUser: Identifiable, Codable {
+    @DocumentID var id: String?
+    var phoneNumber: String
+    var displayName: String
+    var activeMode: String
+    var createdAt: Date
 }
 
 // 2. We added "Codable" here so it can be folded up and sent to Firebase

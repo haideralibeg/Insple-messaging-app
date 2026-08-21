@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct InboxView: View {
-    @Binding var isLoggedIn: Bool
+    @EnvironmentObject var auth: AuthService
     @EnvironmentObject var store: ChatStore
     @State private var unreadFilter = false
     @State private var selectedTab = "Messages"
@@ -95,7 +95,7 @@ struct InboxView: View {
             }
             
             // Floating Action Button
-            Button(action: { isLoggedIn = false }) {
+            Button(action: { auth.logout() }) {
                 Text("Me")
                     .font(.headline)
                     .fontWeight(.bold)
