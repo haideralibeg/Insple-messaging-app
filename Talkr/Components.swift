@@ -1,0 +1,86 @@
+import SwiftUI
+
+// MARK: - TopThemeBar
+struct TopThemeBar: View {
+    @EnvironmentObject var theme: ThemeManager
+
+    var body: some View {
+        HStack {
+            Text("Talkr")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(theme.secondaryTextColor)
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                // Gen Z pill
+                Button(action: { theme.set("genz") }) {
+                    Text("Gen Z")
+                        .font(.caption).fontWeight(.semibold)
+                        .padding(.horizontal, 12).padding(.vertical, 5)
+                        .background(theme.activeMode == "genz" ? theme.primaryColor : Color.clear)
+                        .foregroundColor(theme.activeMode == "genz" ? theme.primaryTextColor : theme.secondaryTextColor)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(
+                                theme.activeMode == "genz" ? Color.clear : theme.secondaryTextColor.opacity(0.4),
+                                lineWidth: 1.5
+                            )
+                        )
+                }
+
+                // Nostalgic pill
+                Button(action: { theme.set("nostalgic") }) {
+                    Text("Nostalgic")
+                        .font(.caption).fontWeight(.semibold)
+                        .padding(.horizontal, 12).padding(.vertical, 5)
+                        .background(theme.activeMode == "nostalgic" ? theme.primaryColor : Color.clear)
+                        .foregroundColor(theme.activeMode == "nostalgic" ? theme.primaryTextColor : theme.secondaryTextColor)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(
+                                theme.activeMode == "nostalgic" ? Color.clear : theme.secondaryTextColor.opacity(0.4),
+                                lineWidth: 1.5
+                            )
+                        )
+                }
+
+                // More options
+                Button(action: {}) {
+                    Image(systemName: "ellipsis")
+                        .font(.caption)
+                        .foregroundColor(theme.secondaryTextColor)
+                        .padding(8)
+                        .overlay(Circle().stroke(theme.secondaryTextColor.opacity(0.3), lineWidth: 1))
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+        .animation(.easeInOut(duration: 0.25), value: theme.activeMode)
+    }
+}
+
+// MARK: - AvatarView
+struct AvatarView: View {
+    @EnvironmentObject var theme: ThemeManager
+    var size: CGFloat = 50
+    var showUnreadDot: Bool = false
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Circle()
+                .fill(theme.primaryColor)
+                .frame(width: size, height: size)
+
+            if showUnreadDot {
+                Circle()
+                    .fill(theme.unreadDotColor)
+                    .frame(width: 12, height: 12)
+                    .overlay(Circle().stroke(theme.backgroundColor, lineWidth: 2))
+                    .offset(x: -2, y: 2)
+            }
+        }
+    }
+}
