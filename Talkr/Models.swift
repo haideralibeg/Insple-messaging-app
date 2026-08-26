@@ -206,6 +206,7 @@ class AuthService: ObservableObject {
     // Session state
     @Published var currentUser: User? = nil
     @Published var isAuthenticated: Bool = false
+    @Published var isEmailVerified: Bool = false
 
     // Onboarding state
     @Published var screen: OnboardingScreen = .login
@@ -222,10 +223,12 @@ class AuthService: ObservableObject {
                 let newUser = User(id: user.uid, name: user.displayName ?? user.email ?? user.phoneNumber ?? "Unknown")
                 self?.currentUser = newUser
                 self?.isAuthenticated = true
+                self?.isEmailVerified = user.isEmailVerified
                 try? Firestore.firestore().collection("users").document(user.uid).setData(from: newUser)
             } else {
                 self?.currentUser = nil
                 self?.isAuthenticated = false
+                self?.isEmailVerified = false
             }
         }
     }
@@ -244,6 +247,11 @@ class AuthService: ObservableObject {
     func goBackToOTP() {
         errorMessage = nil
         screen = .signUpOTP
+    }
+    
+    func goBackToEmailEntry() {
+        errorMessage = nil
+        screen = .signUpPhone
     }
 
     // MARK: Login
@@ -288,6 +296,19 @@ class AuthService: ObservableObject {
             // authListener above will automatically set isAuthenticated = true
         } catch {
             await MainActor.run { self.errorMessage = error.localizedDescription }
+        }
+    }
+    
+    func resendVerificationEmail() async {
+        guard let user = Auth.auth().currentUser else { return }
+        try? await user.sendEmailVerification()
+    }
+
+    func refreshEmailVerifiedStatus() async {
+        guard let user = Auth.auth().currentUser else { return }
+        try? await user.reload()
+        await MainActor.run {
+            self.isEmailVerified = Auth.auth().currentUser?.isEmailVerified ?? false
         }
     }
 

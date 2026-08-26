@@ -6,8 +6,12 @@ struct ContentView: View {
     var body: some View {
         Group {
             if auth.isAuthenticated {
-                NavigationStack {
-                    InboxView()
+                if auth.isEmailVerified {
+                    NavigationStack {
+                        InboxView()
+                    }
+                } else {
+                    VerifyEmailView()
                 }
             } else {
                 // The $ creates a perfect 2-way connection to the Auth manager!
@@ -16,5 +20,6 @@ struct ContentView: View {
         }
         // This makes the screen slide nicely when the value changes
         .animation(.easeInOut, value: auth.isAuthenticated)
+        .animation(.easeInOut, value: auth.isEmailVerified)
     }
 }

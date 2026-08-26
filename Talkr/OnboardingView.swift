@@ -280,7 +280,7 @@ struct SignUpPasswordView: View {
     var body: some View {
         VStack {
             HStack {
-                Button(action: { auth.goBackToOTP() }) {
+                Button(action: { auth.goBackToEmailEntry() }) {
                     HStack(spacing: 6) {
                         Image(systemName: "chevron.left")
                         Text("Back")
@@ -387,6 +387,81 @@ struct SignUpPasswordView: View {
             }
             .padding(.horizontal, 30).padding(.top, 20)
             .disabled(!isReady || auth.isLoading)
+
+            Spacer()
+        }
+    }
+}
+
+struct VerifyEmailView: View {
+    @EnvironmentObject var auth: AuthService
+    @State private var isChecking = false
+    @State private var isResending = false
+    @State private var resendConfirmation: String?
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            Image(systemName: "envelope.badge")
+                .font(.system(size: 56))
+                .foregroundColor(.black)
+
+            Text("Verify your email")
+                .font(.title2).fontWeight(.bold)
+
+            Text("We sent a verification link to your email. Please check your inbox and click the link, then tap the button below.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 30)
+
+            if let confirmation = resendConfirmation {
+                Text(confirmation)
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+
+            Button(action: {
+                Task {
+                    isChecking = true
+                    await auth.refreshEmailVerifiedStatus()
+                    isChecking = false
+                }
+            }) {
+                if isChecking {
+                    ProgressView().tint(.white)
+                        .frame(maxWidth: .infinity).padding()
+                        .background(Color.black).clipShape(Capsule())
+                } else {
+                    Text("I've verified my email")
+                        .font(.headline).foregroundColor(.white)
+                        .frame(maxWidth: .infinity).padding()
+                        .background(Color.black)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.horizontal, 30).padding(.top, 10)
+
+            Button(action: {
+                Task {
+                    isResending = true
+                    await auth.resendVerificationEmail()
+                    isResending = false
+                    resendConfirmation = "Verification email resent."
+                }
+            }) {
+                Text(isResending ? "Sending..." : "Resend email")
+                    .font(.subheadline).foregroundColor(.black)
+            }
+            .disabled(isResending)
+            .padding(.top, 4)
+
+            Button(action: { auth.logout() }) {
+                Text("Log out")
+                    .font(.subheadline).foregroundColor(.red)
+            }
+            .padding(.top, 20)
 
             Spacer()
         }
