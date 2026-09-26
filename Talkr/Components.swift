@@ -84,3 +84,27 @@ struct AvatarView: View {
         }
     }
 }
+
+struct ReadReceiptView: View {
+    @EnvironmentObject var theme: ThemeManager
+    var isRead: Bool
+
+    var body: some View {
+        Group {
+            if theme.activeMode == "genz" {
+                Text(isRead ? "seen" : "sent")
+                    .font(.caption2)
+                    .fontWeight(isRead ? .bold : .regular)
+                    .foregroundColor(isRead ? theme.readReceiptSeenColor : theme.secondaryTextColor.opacity(0.4))
+            } else {
+                HStack(spacing: 3) {
+                    Image(systemName: isRead ? "checkmark.circle.fill" : "checkmark.circle")
+                    Text(isRead ? "Read" : "Delivered")
+                }
+                .font(.caption2)
+                .foregroundColor(isRead ? theme.readReceiptSeenColor : theme.secondaryTextColor.opacity(0.4))
+            }
+        }
+    }
+}
+

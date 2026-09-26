@@ -41,11 +41,36 @@ struct User: Identifiable, Hashable, Codable {
 }
 
 struct ChatMessage: Identifiable, Hashable, Codable {
-    var id: String = UUID().uuidString
+    var id: String
     let senderId: String
     let content: String
     let timestamp: Date
     var isIncoming: Bool
+    var isRead: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id, senderId, content, timestamp, isIncoming, isRead
+    }
+
+    init(id: String = UUID().uuidString, senderId: String, content: String,
+         timestamp: Date, isIncoming: Bool, isRead: Bool = false) {
+        self.id = id
+        self.senderId = senderId
+        self.content = content
+        self.timestamp = timestamp
+        self.isIncoming = isIncoming
+        self.isRead = isRead
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        senderId = try c.decode(String.self, forKey: .senderId)
+        content = try c.decode(String.self, forKey: .content)
+        timestamp = try c.decode(Date.self, forKey: .timestamp)
+        isIncoming = try c.decodeIfPresent(Bool.self, forKey: .isIncoming) ?? false
+        isRead = try c.decodeIfPresent(Bool.self, forKey: .isRead) ?? false
+    }
 }
 
 struct Chat: Identifiable, Hashable {
@@ -137,6 +162,23 @@ class ChatStore: ObservableObject {
             print("Failed to save message: \(error)")
         }
     }
+    
+    func markMessagesAsRead(in chat: Chat) {
+        let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        let unread = chat.messages.filter { $0.senderId != currentUserId && !$0.isRead }
+        guard !unread.isEmpty else { return }
+
+        let batch = db.batch()
+        let messagesRef = db.collection("chats").document(chat.id).collection("messages")
+        for msg in unread {
+            batch.updateData(["isRead": true], forDocument: messagesRef.document(msg.id))
+        }
+        batch.commit { error in
+            if let error = error {
+                print("Failed to mark messages as read: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - ThemeManager
@@ -198,6 +240,9 @@ final class ThemeManager: ObservableObject {
 
     var label1: String { "Gen Z" }
     var label2: String { "Nostalgic" }
+    var readReceiptSeenColor: Color {
+        activeMode == "genz" ? primaryColor : .blue
+    }
 }
 
 // MARK: - AuthService

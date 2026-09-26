@@ -62,27 +62,34 @@ struct ChatView: View {
                             .padding(.top, 20).padding(.bottom, 10)
 
                         ForEach(liveChat.messages) { message in
-                            HStack(alignment: .bottom, spacing: 8) {
-                                if message.isIncoming {
-                                    Circle()
-                                        .fill(theme.primaryColor)
-                                        .frame(width: 24, height: 24)
-                                } else {
-                                    Spacer()
+                            VStack(alignment: message.isIncoming ? .leading : .trailing, spacing: 2) {
+                                HStack(alignment: .bottom, spacing: 8) {
+                                    if message.isIncoming {
+                                        Circle()
+                                            .fill(theme.primaryColor)
+                                            .frame(width: 24, height: 24)
+                                    } else {
+                                        Spacer()
+                                    }
+
+                                    Text(message.content)
+                                        .foregroundColor(message.isIncoming
+                                            ? theme.secondaryTextColor
+                                            : theme.primaryTextColor)
+                                        .padding(.horizontal, 16).padding(.vertical, 10)
+                                        .background(message.isIncoming
+                                            ? theme.incomingBubbleColor
+                                            : theme.outgoingBubbleColor)
+                                        .cornerRadius(20)
+
+                                    if message.isIncoming {
+                                        Spacer()
+                                    }
                                 }
 
-                                Text(message.content)
-                                    .foregroundColor(message.isIncoming
-                                        ? theme.secondaryTextColor
-                                        : theme.primaryTextColor)
-                                    .padding(.horizontal, 16).padding(.vertical, 10)
-                                    .background(message.isIncoming
-                                        ? theme.incomingBubbleColor
-                                        : theme.outgoingBubbleColor)
-                                    .cornerRadius(20)
-
-                                if message.isIncoming {
-                                    Spacer()
+                                if !message.isIncoming, message.id == liveChat.messages.last(where: { !$0.isIncoming })?.id {
+                                    ReadReceiptView(isRead: message.isRead)
+                                        .padding(.trailing, 8)
                                 }
                             }
                             .padding(.horizontal)
@@ -93,6 +100,7 @@ struct ChatView: View {
                         if let last = liveChat.messages.last {
                             withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                         }
+                        store.markMessagesAsRead(in: liveChat)
                     }
                 }
             }
@@ -131,6 +139,7 @@ struct ChatView: View {
         .onAppear {
             store.markAsRead(chat)
             store.startListening(to: chat)
+            store.markMessagesAsRead(in: chat)
         }
         .onDisappear { store.stopListening() }
     }
