@@ -124,6 +124,7 @@ class ChatStore: ObservableObject {
         stopListening()
         let ref = db.collection("chats").document(chat.id).collection("messages").order(by: "timestamp", descending: false)
 
+        var receivedInitialSnapshot = false
         activeListener = ref.addSnapshotListener { [weak self] snapshot, _ in
             guard let self, let documents = snapshot?.documents else { return }
             let currentUserId = Auth.auth().currentUser?.uid ?? ""
@@ -132,8 +133,15 @@ class ChatStore: ObservableObject {
                 msg.isIncoming = msg.senderId != currentUserId
                 return msg
             }
+            let shouldChime = receivedInitialSnapshot && snapshot?.documentChanges.contains(where: {
+                $0.type == .added && ($0.document.data()["senderId"] as? String) != currentUserId
+            }) == true
+            receivedInitialSnapshot = true
             DispatchQueue.main.async {
-                if let idx = self.chats.firstIndex(where: { $0.id == chat.id }), !liveMessages.isEmpty {
+                if shouldChime, ThemeManager.shared.isNostalgic {
+                    NostalgicSounds.shared.play(.received)
+                }
+                if let idx = self.chats.firstIndex(where: { $0.id == chat.id }) {
                     self.chats[idx].messages = liveMessages
                 }
             }
@@ -209,29 +217,31 @@ final class ThemeManager: ObservableObject {
         AuthService.shared.updateMode(mode)
     }
 
+    var isNostalgic: Bool { activeMode == "nostalgic" }
+
     // MARK: Theme Colors
 
-    // Gen Z = dark mode, Nostalgic = light mode
+    // Gen Z uses a dark canvas; Nostalgic uses desktop messenger chrome.
     var backgroundColor: Color {
-        activeMode == "genz" ? Color(red: 0.07, green: 0.07, blue: 0.07) : .white
+        activeMode == "genz" ? Color(red: 0.07, green: 0.07, blue: 0.07) : RetroPalette.desktop
     }
     var primaryColor: Color {
-        activeMode == "genz" ? .white : .black
+        activeMode == "genz" ? .white : RetroPalette.navy
     }
     var primaryTextColor: Color {
         activeMode == "genz" ? .black : .white
     }
     var secondaryTextColor: Color {
-        activeMode == "genz" ? .white : .black
+        activeMode == "genz" ? .white : RetroPalette.ink
     }
     var subtleColor: Color {
-        activeMode == "genz" ? Color(red: 0.2, green: 0.2, blue: 0.2) : Color(.systemGray5)
+        activeMode == "genz" ? Color(red: 0.2, green: 0.2, blue: 0.2) : RetroPalette.panel
     }
     var outgoingBubbleColor: Color {
-        activeMode == "genz" ? Color(red: 0.4, green: 0.2, blue: 0.9) : Color(red: 0.9, green: 0.45, blue: 0.0)
+        activeMode == "genz" ? Color(red: 0.4, green: 0.2, blue: 0.9) : RetroPalette.navy
     }
     var incomingBubbleColor: Color {
-        activeMode == "genz" ? Color(red: 0.18, green: 0.18, blue: 0.18) : Color(.systemGray5)
+        activeMode == "genz" ? Color(red: 0.18, green: 0.18, blue: 0.18) : RetroPalette.panel
     }
     var unreadDotColor: Color {
         activeMode == "genz" ? Color(red: 0.4, green: 0.2, blue: 0.9) : .red
@@ -265,9 +275,21 @@ class AuthService: ObservableObject {
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             if let user {
                 let newUser = User(id: user.uid, name: user.displayName ?? user.email ?? user.phoneNumber ?? "Unknown")
-                self?.currentUser = newUser
-                self?.isAuthenticated = true
-                try? Firestore.firestore().collection("users").document(user.uid).setData(from: newUser)
+                let ref = Firestore.firestore().collection("users").document(user.uid)
+                ref.getDocument { [weak self] snapshot, _ in
+                    guard Auth.auth().currentUser?.uid == user.uid else { return }
+                    let savedMode = snapshot?.data()?["activeMode"] as? String
+                    var profile = newUser
+                    profile.activeMode = savedMode == "nostalgic" ? "nostalgic" : "genz"
+                    DispatchQueue.main.async {
+                        self?.currentUser = profile
+                        self?.isAuthenticated = true
+                    }
+                    // Preserve existing preferences and other profile fields.
+                    if snapshot?.exists == false {
+                        try? ref.setData(from: profile, merge: true)
+                    }
+                }
             } else {
                 self?.currentUser = nil
                 self?.isAuthenticated = false
