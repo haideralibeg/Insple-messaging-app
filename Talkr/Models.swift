@@ -75,7 +75,7 @@ struct ChatMessage: Identifiable, Hashable, Codable {
 
 struct Chat: Identifiable, Hashable {
     var id: String
-    let partner: User
+    var partner: User
     var lastMessage: String
     var timeAgo: String
     var isUnread: Bool
@@ -86,9 +86,12 @@ struct Chat: Identifiable, Hashable {
 class ChatStore: ObservableObject {
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
+    @Published var openChatId: String? = nil
 
     private let db = Firestore.firestore()
     private var activeListener: ListenerRegistration?
+    private var inboxListeners: [String: ListenerRegistration] = [:]
+    private var chatsListener: ListenerRegistration?
 
     func fetchContacts() {
         db.collection("users").addSnapshotListener { snapshot, error in
@@ -98,6 +101,34 @@ class ChatStore: ObservableObject {
                 guard let user = try? doc.data(as: User.self) else { return nil }
                 return user.id == currentUserId ? nil : user
             }
+            self.discoverChats()
+        }
+    }
+    
+    func discoverChats() {
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+
+        for contact in contacts {
+            let roomId = [currentUserId, contact.id].sorted().joined(separator: "_")
+
+            if chats.contains(where: { $0.id == roomId }) { continue }
+
+            let ref = db.collection("chats").document(roomId).collection("messages")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 1)
+
+            ref.getDocuments { [weak self] snapshot, _ in
+                guard let self,
+                      let doc = snapshot?.documents.first,
+                      let msg = try? doc.data(as: ChatMessage.self) else { return }   // no history -> skip, don't show
+
+                DispatchQueue.main.async {
+                    guard !self.chats.contains(where: { $0.id == roomId }) else { return }
+                    let chat = Chat(id: roomId, partner: contact, lastMessage: msg.content, timeAgo: "", isUnread: false, messages: [])
+                    self.chats.append(chat)
+                    self.attachInboxListener(for: chat)
+                }
+            }
         }
     }
 
@@ -106,13 +137,55 @@ class ChatStore: ObservableObject {
         let roomId = [currentUserId, partner.id].sorted().joined(separator: "_")
 
         if let existing = chats.first(where: { $0.id == roomId }) {
+            attachInboxListener(for: existing)   // ADDED: covers chats opened again this session
             return existing
         }
 
         let newChat = Chat(id: roomId, partner: partner, lastMessage: "Start of chat", timeAgo: "", isUnread: false, messages: [])
-        DispatchQueue.main.async { self.chats.insert(newChat, at: 0) }
+        attachInboxListener(for: newChat)        // ADDED: the missing call
+
+        DispatchQueue.main.async {
+            guard !self.chats.contains(where: { $0.id == roomId }) else { return }
+            self.chats.insert(newChat, at: 0)
+        }
+        
+        let myName = AuthService.shared.currentUser?.name ?? "Unknown"
+                let roomData: [String: Any] = [
+                    "participants": [currentUserId, partner.id],
+                    "participantInfo": [
+                        currentUserId: ["id": currentUserId, "name": myName],
+                        partner.id: ["id": partner.id, "name": partner.name]
+                    ],
+                    "lastMessage": "Start of chat"
+                ]
+                db.collection("chats").document(roomId).setData(roomData, merge: true)
+        
         return newChat
     }
+    
+    private func attachInboxListener(for chat: Chat) {
+            guard inboxListeners[chat.id] == nil else { return }
+
+            let ref = db.collection("chats").document(chat.id).collection("messages")
+                .order(by: "timestamp", descending: true)
+                .limit(to: 1)
+
+            let listener = ref.addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let doc = snapshot?.documents.first,
+                      let msg = try? doc.data(as: ChatMessage.self) else { return }
+                let currentUserId = Auth.auth().currentUser?.uid ?? ""
+                let isIncoming = msg.senderId != currentUserId
+
+                DispatchQueue.main.async {
+                    guard let idx = self.chats.firstIndex(where: { $0.id == chat.id }) else { return }
+                    self.chats[idx].lastMessage = msg.content
+                    if isIncoming && self.openChatId != chat.id {
+                        self.chats[idx].isUnread = true
+                    }
+                }
+            }
+            inboxListeners[chat.id] = listener
+        }
 
     func markAsRead(_ chat: Chat) {
         if let idx = chats.firstIndex(where: { $0.id == chat.id }) {
@@ -160,6 +233,7 @@ class ChatStore: ObservableObject {
 
         do {
             try db.collection("chats").document(chat.id).collection("messages").document(msg.id).setData(from: msg)
+            db.collection("chats").document(chat.id).setData(["lastMessage": text], merge: true)
             DispatchQueue.main.async {
                 self.chats[idx].lastMessage = text
                 self.chats[idx].timeAgo = "Now"

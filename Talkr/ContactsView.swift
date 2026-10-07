@@ -19,6 +19,7 @@ struct ContactsView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var store: ChatStore
     @EnvironmentObject var theme: ThemeManager
+    @Binding var path: [Route]
     @State private var searchText = ""
 
     let alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M",
@@ -78,7 +79,7 @@ struct ContactsView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredContacts) { contact in
-                                NavigationLink(destination: ChatView(chat: store.getOrCreateChat(with: contact))) {
+                                Button(action: { openChat(with: contact) }) {
                                     HStack(spacing: 16) {
                                         AvatarView(size: 50, showUnreadDot: false)
                                         Text(contact.name)
@@ -112,5 +113,14 @@ struct ContactsView: View {
         .navigationBarHidden(true)
         .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
         .onAppear { store.fetchContacts() }
+    }
+    
+    private func openChat(with contact: User) {
+        let chat = store.getOrCreateChat(with: contact)
+        if !path.isEmpty {
+            path[path.count - 1] = .chat(chat)
+        } else {
+            path.append(.chat(chat))
+        }
     }
 }

@@ -4,8 +4,17 @@ struct InboxView: View {
     @EnvironmentObject var store: ChatStore
     @EnvironmentObject var auth: AuthService
     @EnvironmentObject var theme: ThemeManager
+    @Binding var path: [Route]
     @State private var unreadFilter = false
     @State private var selectedTab  = "Messages"
+
+    private var visibleChats: [Chat] {
+        var seen = Set<String>()
+        let deduped = store.chats.filter { seen.insert($0.id).inserted }
+        return deduped.filter { !unreadFilter || $0.isUnread }
+    }
+
+    private var unreadCount: Int { store.chats.filter { $0.isUnread }.count }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -36,10 +45,10 @@ struct InboxView: View {
 
                 if selectedTab == "Messages" {
                     HStack {
-                        filterPill("All",    active: !unreadFilter) { unreadFilter = false }
-                        filterPill("Unread", active:  unreadFilter) { unreadFilter = true  }
+                        filterPill("All", active: !unreadFilter) { unreadFilter = false }
+                        filterPill("Unread", active: unreadFilter, badge: unreadCount) { unreadFilter = true }
                         Spacer()
-                        NavigationLink(destination: ContactsView()) {
+                        Button(action: { path.append(.contacts) }) {
                             Image(systemName: "plus")
                                 .font(.footnote)
                                 .foregroundColor(theme.secondaryTextColor)
@@ -49,19 +58,33 @@ struct InboxView: View {
                     }
                     .padding(.horizontal)
 
-                    if store.chats.filter({ !unreadFilter || $0.isUnread }).isEmpty {
-                        Text(unreadFilter ? "No unread messages." : (theme.isNostalgic ? "Your buddy list is waiting. Tap + to start a chat." : "Tap + to start a conversation."))
-                            .font(.system(.subheadline, design: theme.isNostalgic ? .monospaced : .default))
-                            .foregroundColor(theme.secondaryTextColor)
-                            .padding()
-                    }
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(store.chats.filter { !unreadFilter || $0.isUnread }) { chat in
-                                NavigationLink(destination: ChatView(chat: chat)) {
-                                    ChatRow(chat: chat)
+                    if visibleChats.isEmpty {
+                        if unreadFilter {
+                            VStack(spacing: 10) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(theme.secondaryTextColor.opacity(0.3))
+                                Text("You're all caught up")
+                                    .font(.subheadline)
+                                    .foregroundColor(theme.secondaryTextColor.opacity(0.5))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                        } else {
+                            Text(theme.isNostalgic ? "Your buddy list is waiting. Tap + to start a chat." : "Tap + to start a conversation.")
+                                .font(.system(.subheadline, design: theme.isNostalgic ? .monospaced : .default))
+                                .foregroundColor(theme.secondaryTextColor)
+                                .padding()
+                        }
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 0) {
+                                ForEach(visibleChats) { chat in
+                                    Button(action: { path.append(.chat(chat)) }) {
+                                        ChatRow(chat: chat)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
                         }
                     }
@@ -73,6 +96,7 @@ struct InboxView: View {
                     Spacer()
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             // FAB
             Button(action: { auth.logout() }) {
@@ -102,15 +126,24 @@ struct InboxView: View {
     }
 
     @ViewBuilder
-    private func filterPill(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
+    private func filterPill(_ title: String, active: Bool, badge: Int = 0, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(active ? theme.primaryTextColor : theme.secondaryTextColor)
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(active ? theme.primaryColor : Color.clear)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(active ? Color.clear : theme.secondaryTextColor.opacity(0.2), lineWidth: 1))
+            HStack(spacing: 6) {
+                Text(title).font(.subheadline)
+                if badge > 0 {
+                    Text("\(badge)")
+                        .font(.caption2).fontWeight(.bold)
+                        .foregroundColor(active ? theme.primaryColor : theme.primaryTextColor)
+                        .padding(5)
+                        .background(active ? theme.primaryTextColor : theme.unreadDotColor)
+                        .clipShape(Circle())
+                }
+            }
+            .foregroundColor(active ? theme.primaryTextColor : theme.secondaryTextColor)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(active ? theme.primaryColor : Color.clear)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(active ? Color.clear : theme.secondaryTextColor.opacity(0.2), lineWidth: 1))
         }
     }
 }
@@ -121,11 +154,6 @@ struct ChatRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Circle()
-                .fill(chat.isUnread ? theme.unreadDotColor : Color.clear)
-                .frame(width: 8, height: 8)
-                .padding(.leading, 8)
-
             AvatarView(size: 50, showUnreadDot: false)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -134,18 +162,27 @@ struct ChatRow: View {
                         .font(.headline)
                         .fontWeight(chat.isUnread ? .bold : .semibold)
                         .foregroundColor(theme.secondaryTextColor)
+                    Spacer()
                     Text(chat.timeAgo)
                         .font(.subheadline)
-                        .foregroundColor(theme.secondaryTextColor.opacity(0.4))
+                        .foregroundColor(chat.isUnread ? theme.unreadDotColor : theme.secondaryTextColor.opacity(0.4))
                 }
-                Text(chat.lastMessage)
-                    .font(.subheadline)
-                    .foregroundColor(theme.secondaryTextColor.opacity(0.6))
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(chat.lastMessage)
+                        .font(.subheadline)
+                        .fontWeight(chat.isUnread ? .semibold : .regular)
+                        .foregroundColor(chat.isUnread ? theme.secondaryTextColor.opacity(0.9) : theme.secondaryTextColor.opacity(0.6))
+                        .lineLimit(1)
+                    Spacer()
+                    if chat.isUnread {
+                        Circle()
+                            .fill(theme.unreadDotColor)
+                            .frame(width: 10, height: 10)
+                    }
+                }
             }
-            Spacer()
         }
-        .padding(.vertical, 12)
+        .padding(.horizontal).padding(.vertical, 12)
         .background(theme.backgroundColor)
         .overlay(Divider().background(theme.subtleColor), alignment: .bottom)
     }
