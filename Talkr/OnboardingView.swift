@@ -6,7 +6,7 @@ struct OnboardingView: View {
 
     var body: some View {
         switch auth.screen {
-        case .login:          LoginView()
+        case .login:          PhoneAuthenticationView()
         case .signUpPhone:    SignUpEmailView()
         case .signUpOTP:      SignUpOTPView()
         case .signUpPassword: SignUpPasswordView()

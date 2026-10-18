@@ -1,0 +1,10 @@
+{
+  "name": "talkr-local",
+  "private": true,
+  "scripts": {
+    "start": "firebase emulators:start --project demo-talkr --only auth,firestore,functions",
+    "test": "node --test tests/*.test.mjs",
+    "scheduler": "node functions/local-scheduler.js"
+  },
+  "devDependencies": { "firebase-tools": "15.34.0" }
+}

@@ -34,7 +34,7 @@ enum OnboardingScreen {
 // MARK: - Models
 struct User: Identifiable, Hashable, Codable {
     var id: String
-    let name: String
+    var name: String
     var displayName: String { name }
     var avatarDetails: String? = nil
     var activeMode: String = "genz"  // "genz" | "nostalgic"
@@ -89,9 +89,54 @@ class ChatStore: ObservableObject {
 
     private let db = Firestore.firestore()
     private var activeListener: ListenerRegistration?
+    private var listeningTask: Task<Void, Never>?
+    private var activeChatID: String?
+    private var inboxListener: ListenerRegistration?
+    private var contactsListener: ListenerRegistration?
+    @Published var errorMessage: String?
+
+    func observeInbox(userID: String?) {
+        inboxListener?.remove()
+        contactsListener?.remove()
+        stopListening()
+        chats = []
+        contacts = []
+        guard let userID else { return }
+        inboxListener = db.collection("chats")
+            .whereField("participants", arrayContains: userID)
+            .addSnapshotListener { [weak self] snapshot, error in
+                Task { @MainActor in
+                    guard let self, Auth.auth().currentUser?.uid == userID else { return }
+                    if let error { self.errorMessage = error.localizedDescription; return }
+                    guard let documents = snapshot?.documents else { return }
+                    self.chats = documents.compactMap { document in
+                        let data = document.data()
+                        guard let members = data["participants"] as? [String],
+                              let partnerID = members.first(where: { $0 != userID }) else { return nil }
+                        let names = data["names"] as? [String: String] ?? [:]
+                        let previous = self.chats.first { $0.id == document.documentID }
+                        let timestamp = (data["updatedAt"] as? Timestamp)?.dateValue() ?? .now
+                        return Chat(
+                            id: document.documentID,
+                            partner: User(id: partnerID, name: names[partnerID] ?? previous?.partner.name ?? "Talkr user"),
+                            lastMessage: data["lastMessage"] as? String ?? "",
+                            timeAgo: timestamp.formatted(date: .omitted, time: .shortened),
+                            isUnread: (data["unreadFor"] as? [String] ?? []).contains(userID),
+                            messages: previous?.messages ?? []
+                        )
+                    }.sorted { first, second in
+                        let dates = Dictionary(uniqueKeysWithValues: documents.map {
+                            ($0.documentID, ($0.data()["updatedAt"] as? Timestamp)?.dateValue() ?? .distantPast)
+                        })
+                        return (dates[first.id] ?? .distantPast) > (dates[second.id] ?? .distantPast)
+                    }
+                }
+            }
+    }
 
     func fetchContacts() {
-        db.collection("users").addSnapshotListener { snapshot, error in
+        contactsListener?.remove()
+        contactsListener = db.collection("users").addSnapshotListener { snapshot, error in
             guard let docs = snapshot?.documents else { return }
             let currentUserId = Auth.auth().currentUser?.uid ?? ""
             self.contacts = docs.compactMap { doc in
@@ -115,19 +160,49 @@ class ChatStore: ObservableObject {
     }
 
     func markAsRead(_ chat: Chat) {
-        if let idx = chats.firstIndex(where: { $0.id == chat.id }) {
+        if let idx = chats.firstIndex(where: { $0.id == chat.id }), chats[idx].isUnread {
             chats[idx].isUnread = false
+            if let userID = Auth.auth().currentUser?.uid {
+                db.collection("chats").document(chat.id)
+                    .updateData(["unreadFor": FieldValue.arrayRemove([userID])])
+            }
         }
     }
 
     func startListening(to chat: Chat) {
         stopListening()
-        let ref = db.collection("chats").document(chat.id).collection("messages").order(by: "timestamp", descending: false)
+        guard let userID = Auth.auth().currentUser?.uid else { return }
+        activeChatID = chat.id
+        listeningTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                // Save membership before reading messages, including brand-new conversations.
+                // Merge preserves existing message summaries and read state.
+                try await self.db.collection("chats").document(chat.id).setData([
+                    "participants": [userID, chat.partner.id].sorted(),
+                    "names": [userID: AuthService.shared.currentUser?.name ?? "Talkr user",
+                              chat.partner.id: chat.partner.name]
+                ], merge: true)
+                guard !Task.isCancelled, self.activeChatID == chat.id,
+                      Auth.auth().currentUser?.uid == userID else { return }
+                self.attachMessageListener(to: chat, userID: userID)
+            } catch {
+                guard !Task.isCancelled, Auth.auth().currentUser?.uid == userID else { return }
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
 
+    private func attachMessageListener(to chat: Chat, userID: String) {
+        if !chats.contains(where: { $0.id == chat.id }) { chats.append(chat) }
+        let ref = db.collection("chats").document(chat.id).collection("messages").order(by: "timestamp", descending: false)
         var receivedInitialSnapshot = false
-        activeListener = ref.addSnapshotListener { [weak self] snapshot, _ in
-            guard let self, let documents = snapshot?.documents else { return }
-            let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        activeListener = ref.addSnapshotListener { [weak self] snapshot, error in
+            guard let self, self.activeChatID == chat.id,
+                  Auth.auth().currentUser?.uid == userID else { return }
+            if let error { self.errorMessage = error.localizedDescription; return }
+            guard let documents = snapshot?.documents else { return }
+            let currentUserId = userID
             let liveMessages = documents.compactMap { doc -> ChatMessage? in
                 guard var msg = try? doc.data(as: ChatMessage.self) else { return nil }
                 msg.isIncoming = msg.senderId != currentUserId
@@ -138,6 +213,7 @@ class ChatStore: ObservableObject {
             }) == true
             receivedInitialSnapshot = true
             DispatchQueue.main.async {
+                guard self.activeChatID == chat.id, Auth.auth().currentUser?.uid == userID else { return }
                 if shouldChime, ThemeManager.shared.isNostalgic {
                     NostalgicSounds.shared.play(.received)
                 }
@@ -149,25 +225,36 @@ class ChatStore: ObservableObject {
     }
 
     func stopListening() {
+        activeChatID = nil
+        listeningTask?.cancel()
+        listeningTask = nil
         activeListener?.remove()
         activeListener = nil
     }
 
     func sendMessage(_ text: String, in chat: Chat) {
-        guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
-        let currentUserId = Auth.auth().currentUser?.uid ?? ""
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
         let msg = ChatMessage(id: UUID().uuidString, senderId: currentUserId, content: text, timestamp: Date(), isIncoming: false)
 
         do {
-            try db.collection("chats").document(chat.id).collection("messages").document(msg.id).setData(from: msg)
-            DispatchQueue.main.async {
-                self.chats[idx].lastMessage = text
-                self.chats[idx].timeAgo = "Now"
-                let updated = self.chats.remove(at: idx)
-                self.chats.insert(updated, at: 0)
+            let room = db.collection("chats").document(chat.id)
+            let batch = db.batch()
+            batch.setData([
+                "participants": [currentUserId, chat.partner.id].sorted(),
+                "names": [currentUserId: AuthService.shared.currentUser?.name ?? "Talkr user", chat.partner.id: chat.partner.name],
+                "lastMessage": text,
+                "updatedAt": FieldValue.serverTimestamp(),
+                "unreadFor": [chat.partner.id]
+            ], forDocument: room, merge: true)
+            try batch.setData(from: msg, forDocument: room.collection("messages").document(msg.id))
+            batch.commit { [weak self] error in
+                if let error {
+                    Task { @MainActor in self?.errorMessage = error.localizedDescription }
+                }
             }
+            // The inbox listener updates ordering and summaries after this write.
         } catch {
-            print("Failed to save message: \(error)")
+            errorMessage = error.localizedDescription
         }
     }
     
@@ -271,29 +358,37 @@ class AuthService: ObservableObject {
     private var pendingEmail: String = ""
     private var pendingDisplayName: String = ""
 
+    var isCompletingPhoneSignIn = false
+
     init() {
-        authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
-            if let user {
-                let newUser = User(id: user.uid, name: user.displayName ?? user.email ?? user.phoneNumber ?? "Unknown")
-                let ref = Firestore.firestore().collection("users").document(user.uid)
-                ref.getDocument { [weak self] snapshot, _ in
-                    guard Auth.auth().currentUser?.uid == user.uid else { return }
-                    let savedMode = snapshot?.data()?["activeMode"] as? String
-                    var profile = newUser
-                    profile.activeMode = savedMode == "nostalgic" ? "nostalgic" : "genz"
-                    DispatchQueue.main.async {
-                        self?.currentUser = profile
-                        self?.isAuthenticated = true
-                    }
-                    // Preserve existing preferences and other profile fields.
-                    if snapshot?.exists == false {
-                        try? ref.setData(from: profile, merge: true)
-                    }
-                }
-            } else {
-                self?.currentUser = nil
-                self?.isAuthenticated = false
+        authListener = Auth.auth().addStateDidChangeListener { [weak self] _, _ in
+            Task { @MainActor in
+                guard let self, !self.isCompletingPhoneSignIn else { return }
+                await self.refreshSession()
             }
+        }
+    }
+
+    func refreshSession() async {
+        guard let user = Auth.auth().currentUser else {
+            currentUser = nil
+            isAuthenticated = false
+            return
+        }
+        do {
+            let ref = Firestore.firestore().collection("users").document(user.uid)
+            let snapshot = try await ref.getDocument()
+            guard Auth.auth().currentUser?.uid == user.uid else { return }
+            // A phone number is private account data, not a public display name.
+            var profile = User(id: user.uid, name: snapshot.data()?["name"] as? String ?? user.displayName ?? "Talkr user")
+            profile.activeMode = snapshot.data()?["activeMode"] as? String == "nostalgic" ? "nostalgic" : "genz"
+            if !snapshot.exists || snapshot.data()?["activeMode"] == nil {
+                try ref.setData(from: profile, merge: true)
+            }
+            currentUser = profile
+            isAuthenticated = true
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

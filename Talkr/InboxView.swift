@@ -5,6 +5,7 @@ struct InboxView: View {
     @EnvironmentObject var auth: AuthService
     @EnvironmentObject var theme: ThemeManager
     @State private var unreadFilter = false
+    @State private var showPhoneLink = false
     @State private var selectedTab  = "Messages"
 
     var body: some View {
@@ -84,8 +85,12 @@ struct InboxView: View {
                     .clipShape(Circle())
                     .shadow(color: theme.primaryColor.opacity(0.4), radius: 5, x: 0, y: 5)
             }
+            .contextMenu {
+                Button("Add phone number", systemImage: "phone.badge.plus") { showPhoneLink = true }
+            }
             .padding()
         }
+        .sheet(isPresented: $showPhoneLink) { PhoneAuthenticationView(linking: true) }
         .preferredColorScheme(theme.isNostalgic ? .light : .dark)
         .navigationBarHidden(true)
         .animation(.easeInOut(duration: 0.3), value: theme.activeMode)

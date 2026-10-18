@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(room) { return signedIn() && request.auth.uid in room.participants; }
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.id == uid
+        && request.resource.data.keys().hasOnly(['id', 'name', 'activeMode', 'avatarDetails'])
+        && request.resource.data.name is string;
+    }
+    match /scheduledMessages/{messageID} {
+      allow read, delete: if signedIn() && resource.data.senderId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['id', 'chatId', 'senderId', 'content', 'scheduledFor'])
+        && request.resource.data.id == messageID
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.chatId is string
+        && member(get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data)
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.content.size() <= 10000
+        && request.resource.data.scheduledFor is timestamp
+        && request.resource.data.scheduledFor > request.time;
+    }
+    match /chats/{roomID} {
+      allow read: if member(resource.data);
+      allow create: if member(request.resource.data)
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants[0] != request.resource.data.participants[1];
+      allow update: if member(resource.data)
+        && request.resource.data.participants == resource.data.participants;
+      match /messages/{messageID} {
+        function room() { return get(/databases/$(database)/documents/chats/$(roomID)).data; }
+        function roomAfter() { return getAfter(/databases/$(database)/documents/chats/$(roomID)).data; }
+        allow read: if member(room());
+        allow create: if member(roomAfter())
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 10000
+          && request.resource.data.isRead == false;
+        allow update: if member(room())
+          && resource.data.senderId != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead'])
+          && request.resource.data.isRead == true;
+      }
+    }
+  }
+}

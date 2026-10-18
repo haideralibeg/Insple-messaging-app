@@ -37,12 +37,20 @@ struct NostalgicConversation: View {
     @Binding var messageText: String
     let chat: Chat
     let send: () -> Void
+    let pendingMessages: [ScheduledMessage]
+    let schedule: () -> Void
+    let cancelScheduled: (ScheduledMessage) -> Void
     @AppStorage("nostalgicSoundsEnabled") private var soundsEnabled = true
 
-    init(chat: Chat, messageText: Binding<String>, send: @escaping () -> Void) {
+    init(chat: Chat, messageText: Binding<String>, send: @escaping () -> Void,
+         pendingMessages: [ScheduledMessage], schedule: @escaping () -> Void,
+         cancelScheduled: @escaping (ScheduledMessage) -> Void) {
         self.chat = chat
         self._messageText = messageText
         self.send = send
+        self.pendingMessages = pendingMessages
+        self.schedule = schedule
+        self.cancelScheduled = cancelScheduled
     }
 
     var body: some View {
@@ -101,6 +109,10 @@ struct NostalgicConversation: View {
                             }
                             .id(message.id)
                         }
+                        ForEach(pendingMessages) { message in
+                            ScheduledMessageRow(message: message) { cancelScheduled(message) }
+                                .id(message.id)
+                        }
                     }
                     .font(.system(.subheadline, design: .monospaced))
                     .padding(14)
@@ -108,7 +120,8 @@ struct NostalgicConversation: View {
                 .background(Color.white)
                 .modifier(RetroPanel(inset: true))
                 .onAppear { scrollToLatest(proxy) }
-                .onChange(of: chat.messages.count) { _ in scrollToLatest(proxy) }
+                .onChange(of: chat.messages.count) { _, _ in scrollToLatest(proxy) }
+                .onChange(of: pendingMessages) { _, _ in scrollToLatest(proxy) }
             }
             .padding(.horizontal, 10)
 
@@ -130,8 +143,16 @@ struct NostalgicConversation: View {
                     .background(Color.white)
                     .modifier(RetroPanel(inset: true))
                 HStack {
-                    Text("Enter a message, then Send.")
-                        .font(.system(.caption2, design: .monospaced))
+                    if LocalDevelopment.usesEmulators {
+                        Button(action: schedule) {
+                            Label("Send later", systemImage: "clock")
+                        }
+                        .buttonStyle(RetroButtonStyle())
+                        .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    } else {
+                        Text("Enter a message, then Send.")
+                            .font(.system(.caption2, design: .monospaced))
+                    }
                     Spacer()
                     Button("Send", action: send)
                         .buttonStyle(RetroButtonStyle())
@@ -148,7 +169,8 @@ struct NostalgicConversation: View {
     }
 
     private func scrollToLatest(_ proxy: ScrollViewProxy) {
-        if let last = chat.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
+        if let pending = pendingMessages.last { proxy.scrollTo(pending.id, anchor: .bottom) }
+        else if let last = chat.messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
     }
 }
 

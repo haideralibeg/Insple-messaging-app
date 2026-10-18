@@ -1,0 +1,7 @@
+node_modules/
+functions/node_modules/
+functions/.secret.local
+functions/.env*
+.firebase/
+*-debug.log
+*-debug.*.log

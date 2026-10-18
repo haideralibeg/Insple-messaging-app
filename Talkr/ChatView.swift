@@ -6,6 +6,12 @@ struct ChatView: View {
     @EnvironmentObject var theme: ThemeManager
     var chat: Chat
     @State private var messageText = ""
+    @State private var isShowingSchedule = false
+    @Environment(ScheduledMessageStore.self) private var scheduled
+
+    private var pendingMessages: [ScheduledMessage] {
+        scheduled.messages.filter { $0.chatId == chat.id }
+    }
 
     var liveChat: Chat {
         store.chats.first(where: { $0.id == chat.id }) ?? chat
@@ -20,12 +26,15 @@ struct ChatView: View {
                     }
                     .buttonStyle(RetroButtonStyle())
                     Spacer()
+                    CallButtons(partner: chat.partner)
                 }
                 .padding(.horizontal, 10).padding(.top, 8)
             }
             TopThemeBar()
             if theme.isNostalgic {
-                NostalgicConversation(chat: liveChat, messageText: $messageText, send: sendMessage)
+                NostalgicConversation(chat: liveChat, messageText: $messageText, send: sendMessage,
+                    pendingMessages: pendingMessages, schedule: { isShowingSchedule = true },
+                    cancelScheduled: { message in Task { await scheduled.cancel(message) } })
             } else {
                 // Header
                 HStack(spacing: 16) {
@@ -48,18 +57,7 @@ struct ChatView: View {
 
                     Spacer()
 
-                    HStack(spacing: 20) {
-                        Button(action: {}) {
-                            Image(systemName: "phone")
-                                .font(.title3)
-                                .foregroundColor(theme.secondaryTextColor)
-                        }
-                        Button(action: {}) {
-                            Image(systemName: "video")
-                                .font(.title3)
-                                .foregroundColor(theme.secondaryTextColor)
-                        }
-                    }
+                    CallButtons(partner: chat.partner)
                 }
                 .padding(.horizontal)
                 .padding(.top, 10)
@@ -109,8 +107,18 @@ struct ChatView: View {
                                 .padding(.horizontal)
                                 .id(message.id)
                             }
+                            ForEach(pendingMessages) { message in
+                                ScheduledMessageRow(message: message) {
+                                    Task { await scheduled.cancel(message) }
+                                }
+                                .padding(.horizontal)
+                                .id(message.id)
+                            }
                         }
-                        .onChange(of: liveChat.messages.count) { _ in
+                        .onChange(of: pendingMessages) { _, messages in
+                            if let last = messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
+                        }
+                        .onChange(of: liveChat.messages.count) { _, _ in
                             if let last = liveChat.messages.last {
                                 withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                             }
@@ -122,6 +130,14 @@ struct ChatView: View {
 
                 // Input bar
                 HStack(spacing: 12) {
+                    if LocalDevelopment.usesEmulators {
+                        Button { isShowingSchedule = true } label: {
+                            Image(systemName: "clock").font(.title2)
+                        }
+                        .foregroundStyle(theme.secondaryTextColor)
+                        .accessibilityLabel("Schedule message")
+                        .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                     HStack {
                         TextField("Message...", text: $messageText)
                             .foregroundColor(theme.secondaryTextColor)
@@ -157,10 +173,34 @@ struct ChatView: View {
             store.startListening(to: chat)
             store.markMessagesAsRead(in: chat)
         }
-        .onChange(of: liveChat.messages) { _ in
+        .onChange(of: liveChat.messages) { _, _ in
+            store.markAsRead(liveChat)
             store.markMessagesAsRead(in: liveChat)
         }
+        .onChange(of: liveChat.isUnread) { _, isUnread in
+            if isUnread { store.markAsRead(liveChat) }
+        }
         .onDisappear { store.stopListening() }
+        .sheet(isPresented: $isShowingSchedule) {
+            ScheduleMessageSheet(content: messageText) { date in
+                let draft = messageText
+                let saved = await scheduled.schedule(draft, in: chat, for: date)
+                if saved, messageText == draft { messageText = "" }
+                return saved
+            }
+        }
+        .alert("Scheduling unavailable", isPresented: Binding(
+            get: { scheduled.errorMessage != nil && !isShowingSchedule },
+            set: { if !$0 { scheduled.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { scheduled.errorMessage = nil }
+        } message: { Text(scheduled.errorMessage ?? "") }
+        .alert("Message could not be saved", isPresented: Binding(
+            get: { store.errorMessage != nil },
+            set: { if !$0 { store.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { store.errorMessage = nil }
+        } message: { Text(store.errorMessage ?? "") }
     }
 
     private func sendMessage() {
