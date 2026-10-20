@@ -114,3 +114,14 @@ struct ContactsView: View {
         .onAppear { store.fetchContacts() }
     }
 }
+
+#if DEBUG
+#Preview("Contacts — Gen Z") {
+    PreviewHost { _ in ContactsView() }
+}
+
+#Preview("Contacts — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in ContactsView() }
+}
+
+#endif

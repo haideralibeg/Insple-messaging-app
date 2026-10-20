@@ -150,3 +150,22 @@ struct ChatRow: View {
         .overlay(Divider().background(theme.subtleColor), alignment: .bottom)
     }
 }
+
+#if DEBUG
+#Preview("Inbox — Gen Z") {
+    PreviewHost { _ in InboxView() }
+}
+
+#Preview("Inbox — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in InboxView() }
+}
+
+#Preview("Inbox — Empty") {
+    PreviewHost(empty: true) { _ in InboxView() }
+}
+
+#Preview("Chat Row") {
+    PreviewHost { _ in ChatRow(chat: PreviewData.chats[0]) }
+}
+
+#endif

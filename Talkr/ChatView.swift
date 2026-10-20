@@ -170,3 +170,14 @@ struct ChatView: View {
         messageText = ""
     }
 }
+
+#if DEBUG
+#Preview("Chat — Gen Z") {
+    PreviewHost { _ in ChatView(chat: PreviewData.chats[0]) }
+}
+
+#Preview("Chat — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in ChatView(chat: PreviewData.chats[0]) }
+}
+
+#endif

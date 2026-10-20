@@ -18,3 +18,18 @@ struct ContentView: View {
         .animation(.easeInOut, value: auth.isAuthenticated)
     }
 }
+
+#if DEBUG
+#Preview("App — Gen Z") {
+    PreviewHost { _ in ContentView() }
+}
+
+#Preview("App — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in ContentView() }
+}
+
+#Preview("App — Signed Out") {
+    PreviewHost(authenticated: false) { _ in ContentView() }
+}
+
+#endif

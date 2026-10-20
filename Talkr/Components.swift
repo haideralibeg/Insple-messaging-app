@@ -134,3 +134,28 @@ struct ReadReceiptView: View {
     }
 }
 
+
+#if DEBUG
+#Preview("Components — Gen Z") {
+    PreviewHost(mode: "genz") { _ in
+        VStack(spacing: 24) {
+            TopThemeBar()
+            AvatarView(showUnreadDot: true)
+            ReadReceiptView(isRead: false)
+            ReadReceiptView(isRead: true)
+        }
+    }
+}
+
+#Preview("Components — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in
+        VStack(spacing: 24) {
+            TopThemeBar()
+            AvatarView(showUnreadDot: true)
+            ReadReceiptView(isRead: false)
+            ReadReceiptView(isRead: true)
+        }
+    }
+}
+
+#endif
