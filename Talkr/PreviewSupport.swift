@@ -17,7 +17,7 @@ struct PreviewHost<Content: View>: View {
     init(mode: String = "genz", authenticated: Bool = true, empty: Bool = false,
          @ViewBuilder content: @escaping (Binding<[Route]>) -> Content) {
         let auth = AuthService(isPreview: true)
-        auth.currentUser = User(id: "preview-me", name: "Sam Taylor", activeMode: mode)
+        auth.currentUser = User(id: "preview-me", name: "John Doe", activeMode: mode)
         auth.isAuthenticated = authenticated
         let store = ChatStore(isPreview: true)
         store.contacts = PreviewData.contacts

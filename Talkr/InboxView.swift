@@ -74,8 +74,8 @@ struct InboxView: View {
                 }
             }
 
-            // FAB
-            Button(action: { auth.logout() }) {
+            // Profile entry point
+            NavigationLink(destination: ProfileView()) {
                 Text(auth.currentUser?.displayName.prefix(1).uppercased() ?? "Me")
                     .font(.headline).fontWeight(.bold)
                     .foregroundColor(theme.primaryTextColor)
@@ -84,6 +84,7 @@ struct InboxView: View {
                     .clipShape(Circle())
                     .shadow(color: theme.primaryColor.opacity(0.4), radius: 5, x: 0, y: 5)
             }
+            .accessibilityLabel("Open your profile")
             .padding()
         }
         .preferredColorScheme(theme.isNostalgic ? .light : .dark)

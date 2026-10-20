@@ -313,6 +313,7 @@ class AuthService: ObservableObject {
     static let shared = AuthService()  // singleton for ThemeManager access
     // Session state
     @Published var currentUser: User? = nil
+    @Published private(set) var accountEmail: String? = nil
     @Published var isAuthenticated: Bool = false
 
     // Onboarding state
@@ -330,6 +331,7 @@ class AuthService: ObservableObject {
         self.isPreview = isPreview
         guard !isPreview else { return }
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            self?.accountEmail = user?.email
             if let user {
                 let newUser = User(id: user.uid, name: user.displayName ?? user.email ?? user.phoneNumber ?? "Unknown")
                 let ref = Firestore.firestore().collection("users").document(user.uid)
