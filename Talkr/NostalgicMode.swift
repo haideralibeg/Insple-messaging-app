@@ -195,3 +195,12 @@ final class NostalgicSounds {
         }
     }
 }
+
+#if DEBUG
+#Preview("Nostalgic Conversation") {
+    PreviewHost(mode: "nostalgic") { _ in
+        ChatView(chat: PreviewData.chats[0])
+    }
+}
+
+#endif

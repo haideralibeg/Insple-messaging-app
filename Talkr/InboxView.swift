@@ -98,8 +98,8 @@ struct InboxView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            // FAB
-            Button(action: { auth.logout() }) {
+            // Profile entry point
+            NavigationLink(destination: ProfileView()) {
                 Text(auth.currentUser?.displayName.prefix(1).uppercased() ?? "Me")
                     .font(.headline).fontWeight(.bold)
                     .foregroundColor(theme.primaryTextColor)
@@ -108,6 +108,7 @@ struct InboxView: View {
                     .clipShape(Circle())
                     .shadow(color: theme.primaryColor.opacity(0.4), radius: 5, x: 0, y: 5)
             }
+            .accessibilityLabel("Open your profile")
             .padding()
         }
         .preferredColorScheme(theme.isNostalgic ? .light : .dark)
@@ -187,3 +188,22 @@ struct ChatRow: View {
         .overlay(Divider().background(theme.subtleColor), alignment: .bottom)
     }
 }
+
+#if DEBUG
+#Preview("Inbox — Gen Z") {
+    PreviewHost { _ in InboxView() }
+}
+
+#Preview("Inbox — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in InboxView() }
+}
+
+#Preview("Inbox — Empty") {
+    PreviewHost(empty: true) { _ in InboxView() }
+}
+
+#Preview("Chat Row") {
+    PreviewHost { _ in ChatRow(chat: PreviewData.chats[0]) }
+}
+
+#endif

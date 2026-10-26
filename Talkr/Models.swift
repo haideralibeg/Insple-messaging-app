@@ -88,12 +88,18 @@ class ChatStore: ObservableObject {
     @Published var contacts: [User] = []
     @Published var openChatId: String? = nil
 
-    private let db = Firestore.firestore()
+    private lazy var db = Firestore.firestore()
+    private let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+    }
     private var activeListener: ListenerRegistration?
     private var inboxListeners: [String: ListenerRegistration] = [:]
     private var chatsListener: ListenerRegistration?
 
     func fetchContacts() {
+        guard !isPreview else { return }
         db.collection("users").addSnapshotListener { snapshot, error in
             guard let docs = snapshot?.documents else { return }
             let currentUserId = Auth.auth().currentUser?.uid ?? ""
@@ -104,8 +110,9 @@ class ChatStore: ObservableObject {
             self.discoverChats()
         }
     }
-    
+
     func discoverChats() {
+        guard !isPreview else { return }
         guard let currentUserId = Auth.auth().currentUser?.uid else { return }
 
         for contact in contacts {
@@ -133,6 +140,12 @@ class ChatStore: ObservableObject {
     }
 
     func getOrCreateChat(with partner: User) -> Chat {
+        if isPreview {
+            if let chat = chats.first(where: { $0.partner.id == partner.id }) { return chat }
+            let chat = Chat(id: "preview-\(partner.id)", partner: partner, lastMessage: "Start of chat", timeAgo: "Now", isUnread: false, messages: [])
+            chats.insert(chat, at: 0)
+            return chat
+        }
         let currentUserId = Auth.auth().currentUser?.uid ?? "me"
         let roomId = [currentUserId, partner.id].sorted().joined(separator: "_")
 
@@ -194,6 +207,7 @@ class ChatStore: ObservableObject {
     }
 
     func startListening(to chat: Chat) {
+        guard !isPreview else { return }
         stopListening()
         let ref = db.collection("chats").document(chat.id).collection("messages").order(by: "timestamp", descending: false)
 
@@ -227,6 +241,13 @@ class ChatStore: ObservableObject {
     }
 
     func sendMessage(_ text: String, in chat: Chat) {
+        if isPreview {
+            guard let index = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+            chats[index].messages.append(ChatMessage(senderId: "preview-me", content: text, timestamp: Date(), isIncoming: false))
+            chats[index].lastMessage = text
+            chats[index].timeAgo = "Now"
+            return
+        }
         guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
         let msg = ChatMessage(id: UUID().uuidString, senderId: currentUserId, content: text, timestamp: Date(), isIncoming: false)
@@ -246,6 +267,7 @@ class ChatStore: ObservableObject {
     }
     
     func markMessagesAsRead(in chat: Chat) {
+        guard !isPreview else { return }
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
         let unread = chat.messages.filter { $0.senderId != currentUserId && !$0.isRead }
         guard !unread.isEmpty else { return }
@@ -272,7 +294,11 @@ final class ThemeManager: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    private init() {
+    private let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+        guard !isPreview else { return }
         AuthService.shared.$currentUser
             .compactMap { $0?.activeMode }
             .receive(on: RunLoop.main)
@@ -283,12 +309,12 @@ final class ThemeManager: ObservableObject {
     func toggle() {
         let next = activeMode == "genz" ? "nostalgic" : "genz"
         activeMode = next
-        AuthService.shared.updateMode(next)
+        if !isPreview { AuthService.shared.updateMode(next) }
     }
 
     func set(_ mode: String) {
         activeMode = mode
-        AuthService.shared.updateMode(mode)
+        if !isPreview { AuthService.shared.updateMode(mode) }
     }
 
     var isNostalgic: Bool { activeMode == "nostalgic" }
@@ -334,6 +360,7 @@ class AuthService: ObservableObject {
     static let shared = AuthService()  // singleton for ThemeManager access
     // Session state
     @Published var currentUser: User? = nil
+    @Published private(set) var accountEmail: String? = nil
     @Published var isAuthenticated: Bool = false
 
     // Onboarding state
@@ -345,8 +372,13 @@ class AuthService: ObservableObject {
     private var pendingEmail: String = ""
     private var pendingDisplayName: String = ""
 
-    init() {
+    private let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+        guard !isPreview else { return }
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            self?.accountEmail = user?.email
             if let user {
                 let newUser = User(id: user.uid, name: user.displayName ?? user.email ?? user.phoneNumber ?? "Unknown")
                 let ref = Firestore.firestore().collection("users").document(user.uid)
@@ -389,6 +421,10 @@ class AuthService: ObservableObject {
 
     // MARK: Login
     func login(email: String, password: String) async {
+        if isPreview {
+            await MainActor.run { isAuthenticated = true }
+            return
+        }
         await MainActor.run { isLoading = true; errorMessage = nil }
         defer { Task { await MainActor.run { self.isLoading = false } } }
         do {
@@ -414,6 +450,10 @@ class AuthService: ObservableObject {
 
     // MARK: Sign-up Step 3 — Create account + send verification email
     func signUpCreateAccount(password: String, confirmPassword: String) async {
+        if isPreview {
+            await MainActor.run { isAuthenticated = true }
+            return
+        }
         guard password == confirmPassword else {
             await MainActor.run { errorMessage = "Passwords do not match." }
             return
@@ -434,12 +474,18 @@ class AuthService: ObservableObject {
 
     // MARK: Logout
     func logout() {
+        if isPreview {
+            isAuthenticated = false
+            screen = .login
+            return
+        }
         try? Auth.auth().signOut()
         screen = .login
     }
 
     // MARK: Update theme mode
     func updateMode(_ mode: String) {
+        guard !isPreview else { return }
         guard let uid = currentUser?.id else { return }
         currentUser?.activeMode = mode
         Firestore.firestore().collection("users").document(uid).updateData(["activeMode": mode])

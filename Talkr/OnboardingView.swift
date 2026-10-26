@@ -14,6 +14,25 @@ struct OnboardingView: View {
     }
 }
 
+/// Center the icon and native wordmark together on every onboarding screen.
+private struct OnboardingLogo: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image("OnboardingBubble")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 52, height: 52)
+                // Align the bubble body with the wordmark, allowing for its tail.
+                .offset(y: 3)
+            Text("Talkr")
+                .font(.system(size: 36, weight: .bold))
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Talkr")
+    }
+}
+
 // MARK: - LOGIN SCREEN
 struct LoginView: View {
     @EnvironmentObject var auth: AuthService
@@ -27,8 +46,7 @@ struct LoginView: View {
         VStack {
             Spacer()
 
-            Text("Talkr")
-                .font(.system(size: 36, weight: .bold))
+            OnboardingLogo()
                 .padding(.bottom, 8)
             Text("Stay connected your way")
                 .font(.subheadline)
@@ -133,8 +151,7 @@ struct SignUpEmailView: View {
 
             Spacer()
 
-            Text("Talkr")
-                .font(.system(size: 36, weight: .bold))
+            OnboardingLogo()
                 .padding(.bottom, 8)
             Text("Create your account")
                 .font(.subheadline).foregroundColor(.secondary)
@@ -206,8 +223,7 @@ struct SignUpOTPView: View {
 
             Spacer()
 
-            Text("Talkr")
-                .font(.system(size: 36, weight: .bold))
+            OnboardingLogo()
                 .padding(.bottom, 8)
 
             VStack(spacing: 6) {
@@ -293,8 +309,7 @@ struct SignUpPasswordView: View {
 
             Spacer()
 
-            Text("Talkr")
-                .font(.system(size: 36, weight: .bold))
+            OnboardingLogo()
                 .padding(.bottom, 8)
 
             VStack(spacing: 6) {
@@ -412,3 +427,26 @@ func passwordRequirements(for password: String) -> [PasswordRequirement] {
 func isPasswordStrong(_ password: String) -> Bool {
     passwordRequirements(for: password).allSatisfy { $0.isMet }
 }
+
+#if DEBUG
+#Preview("Onboarding") {
+    PreviewHost(authenticated: false) { _ in OnboardingView() }
+}
+
+#Preview("Login") {
+    PreviewHost(authenticated: false) { _ in LoginView() }
+}
+
+#Preview("Sign Up — Email") {
+    PreviewHost(authenticated: false) { _ in SignUpEmailView() }
+}
+
+#Preview("Sign Up — Verification") {
+    PreviewHost(authenticated: false) { _ in SignUpOTPView() }
+}
+
+#Preview("Sign Up — Password") {
+    PreviewHost(authenticated: false) { _ in SignUpPasswordView() }
+}
+
+#endif
