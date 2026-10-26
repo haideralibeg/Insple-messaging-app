@@ -191,15 +191,15 @@ struct ChatRow: View {
 
 #if DEBUG
 #Preview("Inbox — Gen Z") {
-    PreviewHost { _ in InboxView() }
+    PreviewHost { path in InboxView(path: path) }
 }
 
 #Preview("Inbox — Nostalgic") {
-    PreviewHost(mode: "nostalgic") { _ in InboxView() }
+    PreviewHost(mode: "nostalgic") { path in InboxView(path: path) }
 }
 
 #Preview("Inbox — Empty") {
-    PreviewHost(empty: true) { _ in InboxView() }
+    PreviewHost(empty: true) { path in InboxView(path: path) }
 }
 
 #Preview("Chat Row") {

@@ -1,11 +1,6 @@
 #if DEBUG
 import SwiftUI
 
-enum Route: Hashable {
-    case contacts
-    case chat(Chat)
-}
-
 /// Each canvas owns its state so previews can be edited and interacted with independently.
 struct PreviewHost<Content: View>: View {
     @StateObject private var auth: AuthService
@@ -35,7 +30,7 @@ struct PreviewHost<Content: View>: View {
             content($path)
                 .navigationDestination(for: Route.self) { route in
                     switch route {
-                    case .contacts: ContactsView()
+                    case .contacts: ContactsView(path: $path)
                     case .chat(let chat): ChatView(chat: chat)
                     }
                 }

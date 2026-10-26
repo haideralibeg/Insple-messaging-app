@@ -127,11 +127,11 @@ struct ContactsView: View {
 
 #if DEBUG
 #Preview("Contacts — Gen Z") {
-    PreviewHost { _ in ContactsView() }
+    PreviewHost { path in ContactsView(path: path) }
 }
 
 #Preview("Contacts — Nostalgic") {
-    PreviewHost(mode: "nostalgic") { _ in ContactsView() }
+    PreviewHost(mode: "nostalgic") { path in ContactsView(path: path) }
 }
 
 #endif
