@@ -153,6 +153,7 @@ struct ChatView: View {
         .navigationBarHidden(true)
         .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
         .onAppear {
+            store.openChatId = chat.id
             store.markAsRead(chat)
             store.startListening(to: chat)
             store.markMessagesAsRead(in: chat)
@@ -160,7 +161,11 @@ struct ChatView: View {
         .onChange(of: liveChat.messages) { _ in
             store.markMessagesAsRead(in: liveChat)
         }
-        .onDisappear { store.stopListening() }
+        .onDisappear {
+            store.stopListening()
+            store.openChatId = nil
+            
+        }
     }
 
     private func sendMessage() {
