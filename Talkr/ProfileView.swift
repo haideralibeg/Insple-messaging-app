@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UIKit
 
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,13 +17,19 @@ struct ProfileView: View {
     @State private var blockedIDs: Set<String> = []
     @State private var showingBlockedPeople = false
     @State private var allowedIDs: Set<String> = []
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var profileImage: UIImage?
+    @State private var isLoadingPhoto = false
+    @State private var showingPhotoError = false
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var accent: Color { theme.isNostalgic ? RetroPalette.navy : Color(red: 0.66, green: 0.52, blue: 1) }
 
     var body: some View {
+        let isNostalgic = theme.isNostalgic
+        let currentBackgroundColor = theme.backgroundColor
         ZStack {
-            theme.backgroundColor.ignoresSafeArea()
+            currentBackgroundColor.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     HStack {
@@ -36,12 +44,38 @@ struct ProfileView: View {
                     }
 
                     VStack(spacing: 12) {
-                        Text(String(trimmedName.prefix(1)).uppercased())
-                            .font(.system(size: 38, weight: .bold, design: theme.isNostalgic ? .monospaced : .rounded))
-                            .foregroundStyle(theme.isNostalgic ? .white : .black)
-                            .frame(width: 96, height: 96)
-                            .background(accent, in: RoundedRectangle(cornerRadius: theme.isNostalgic ? 2 : 34))
-                            .accessibilityLabel("Profile initials")
+                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                            profileAvatar
+                                .overlay {
+                                    if isLoadingPhoto {
+                                        RoundedRectangle(cornerRadius: isNostalgic ? 2 : 34)
+                                            .fill(.black.opacity(0.4))
+                                        ProgressView().tint(.white)
+                                    }
+                                }
+                                .overlay(alignment: .bottomTrailing) {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(isNostalgic ? .white : .black)
+                                        .frame(width: 32, height: 32)
+                                        .background(accent, in: Circle())
+                                        .overlay(Circle().stroke(currentBackgroundColor, lineWidth: 3))
+                                        .offset(x: 5, y: 5)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(profileImage == nil ? "Add profile photo" : "Change profile photo")
+                        .accessibilityHint("Opens your photo library")
+                        Text(profileImage == nil ? "Add profile photo" : "Change profile photo")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(accent)
+                        if profileImage != nil {
+                            Button("Remove photo", role: .destructive) {
+                                selectedPhoto = nil
+                                profileImage = nil
+                            }
+                            .font(.caption)
+                        }
                         Text(trimmedName.isEmpty ? "Your profile" : trimmedName)
                             .font(.title2.bold())
                             .multilineTextAlignment(.center)
@@ -55,7 +89,7 @@ struct ProfileView: View {
                                 .textContentType(.name)
                                 .textInputAutocapitalization(.words)
                                 .padding(12)
-                                .background(theme.backgroundColor, in: RoundedRectangle(cornerRadius: 8))
+                                .background(currentBackgroundColor, in: RoundedRectangle(cornerRadius: 8))
                             if trimmedName.isEmpty {
                                 Text("Enter a display name to preview your profile.")
                                     .font(.caption).foregroundStyle(accent)
@@ -73,7 +107,7 @@ struct ProfileView: View {
                             }
                                 .foregroundStyle(theme.secondaryTextColor.opacity(0.5))
                                 .padding(12)
-                                .background(theme.backgroundColor, in: RoundedRectangle(cornerRadius: 8))
+                                .background(currentBackgroundColor, in: RoundedRectangle(cornerRadius: 8))
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel("Email, read only")
                                 .accessibilityValue(auth.accountEmail ?? "Email unavailable")
@@ -154,8 +188,8 @@ struct ProfileView: View {
                         Text("Preview profile")
                             .font(.headline)
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .foregroundStyle(theme.isNostalgic ? .white : .black)
-                            .background(accent, in: RoundedRectangle(cornerRadius: theme.isNostalgic ? 2 : 16))
+                            .foregroundStyle(isNostalgic ? .white : .black)
+                            .background(accent, in: RoundedRectangle(cornerRadius: isNostalgic ? 2 : 16))
                     }
                     .disabled(trimmedName.isEmpty)
                     .opacity(trimmedName.isEmpty ? 0.5 : 1)
@@ -171,10 +205,34 @@ struct ProfileView: View {
             }
         }
         .foregroundStyle(theme.secondaryTextColor)
-        .font(.system(.body, design: theme.isNostalgic ? .monospaced : .default))
+        .font(.system(.body, design: isNostalgic ? .monospaced : .default))
         .tint(accent)
-        .preferredColorScheme(theme.isNostalgic ? .light : .dark)
+        .preferredColorScheme(isNostalgic ? .light : .dark)
         .navigationBarHidden(true)
+        .task(id: selectedPhoto) {
+            guard let selectedPhoto else {
+                isLoadingPhoto = false
+                return
+            }
+            isLoadingPhoto = true
+            defer { isLoadingPhoto = false }
+            do {
+                guard let data = try await selectedPhoto.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data) else {
+                    if !Task.isCancelled { showingPhotoError = true }
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                profileImage = image
+            } catch {
+                if !Task.isCancelled { showingPhotoError = true }
+            }
+        }
+        .alert("Couldn’t load photo", isPresented: $showingPhotoError) {
+            Button("OK", role: .cancel) { selectedPhoto = nil }
+        } message: {
+            Text("Please try again or choose a different image.")
+        }
         .onAppear {
             guard !loaded else { return }
             name = auth.currentUser?.displayName ?? ""
@@ -214,13 +272,12 @@ struct ProfileView: View {
                 }
             }
             .tint(accent)
-            .preferredColorScheme(theme.isNostalgic ? .light : .dark)
+            .preferredColorScheme(isNostalgic ? .light : .dark)
         }
         .sheet(isPresented: $showingPreview) {
             NavigationStack {
                 VStack(spacing: 20) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 76)).foregroundStyle(accent)
+                    profileAvatar
                     if visibility == "Open" || showName {
                         Text(trimmedName).font(.title.bold())
                     } else {
@@ -240,8 +297,26 @@ struct ProfileView: View {
                     }
                 }
             }
-            .preferredColorScheme(theme.isNostalgic ? .light : .dark)
+            .preferredColorScheme(isNostalgic ? .light : .dark)
         }
+    }
+
+    private var profileAvatar: some View {
+        ZStack {
+            if let profileImage {
+                Image(uiImage: profileImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                accent
+                Text(String(trimmedName.prefix(1)).uppercased())
+                    .font(.system(size: 38, weight: .bold, design: theme.isNostalgic ? .monospaced : .rounded))
+                    .foregroundStyle(theme.isNostalgic ? .white : .black)
+            }
+        }
+        .frame(width: 96, height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: theme.isNostalgic ? 2 : 34))
+        .accessibilityLabel(profileImage == nil ? "Profile initials" : "Profile photo")
     }
 
     private func section<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
@@ -270,3 +345,4 @@ struct ProfileView: View {
     PreviewHost(mode: "nostalgic") { _ in ProfileView() }
 }
 #endif
+
