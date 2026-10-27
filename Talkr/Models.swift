@@ -32,7 +32,7 @@ enum OnboardingScreen {
 }
 
 // MARK: - Models
-struct User: Identifiable, Hashable, Codable {
+struct User: Identifiable, Hashable {
     var id: String
     let name: String
     var displayName: String { name }
@@ -40,7 +40,9 @@ struct User: Identifiable, Hashable, Codable {
     var activeMode: String = "genz"  // "genz" | "nostalgic"
 }
 
-struct ChatMessage: Identifiable, Hashable, Codable {
+extension User: nonisolated Codable {}
+
+struct ChatMessage: Identifiable, Hashable {
     var id: String
     let senderId: String
     let content: String
@@ -72,6 +74,8 @@ struct ChatMessage: Identifiable, Hashable, Codable {
         isRead = try c.decodeIfPresent(Bool.self, forKey: .isRead) ?? false
     }
 }
+
+extension ChatMessage: nonisolated Codable { }
 
 struct Chat: Identifiable, Hashable {
     var id: String
@@ -491,3 +495,4 @@ class AuthService: ObservableObject {
         Firestore.firestore().collection("users").document(uid).updateData(["activeMode": mode])
     }
 }
+
