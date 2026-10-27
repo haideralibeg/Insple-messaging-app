@@ -108,7 +108,7 @@ struct NostalgicConversation: View {
                 .background(Color.white)
                 .modifier(RetroPanel(inset: true))
                 .onAppear { scrollToLatest(proxy) }
-                .onChange(of: chat.messages.count) { _ in scrollToLatest(proxy) }
+                .onChange(of: chat.messages.count) { _, _ in scrollToLatest(proxy) }
             }
             .padding(.horizontal, 10)
 

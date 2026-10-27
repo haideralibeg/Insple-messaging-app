@@ -110,7 +110,7 @@ struct ChatView: View {
                                 .id(message.id)
                             }
                         }
-                        .onChange(of: liveChat.messages.count) { _ in
+                        .onChange(of: liveChat.messages.count) {
                             if let last = liveChat.messages.last {
                                 withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                             }
@@ -158,7 +158,7 @@ struct ChatView: View {
             store.startListening(to: chat)
             store.markMessagesAsRead(in: chat)
         }
-        .onChange(of: liveChat.messages) { _ in
+        .onChange(of: liveChat.messages) {
             store.markMessagesAsRead(in: liveChat)
         }
         .onDisappear {
@@ -186,3 +186,4 @@ struct ChatView: View {
 }
 
 #endif
+
