@@ -6,6 +6,7 @@ struct ChatView: View {
     @EnvironmentObject var theme: ThemeManager
     var chat: Chat
     @State private var messageText = ""
+    @State private var presentedCall: CallKind?
 
     var liveChat: Chat {
         store.chats.first(where: { $0.id == chat.id }) ?? chat
@@ -25,6 +26,17 @@ struct ChatView: View {
             }
             TopThemeBar()
             if theme.isNostalgic {
+                HStack {
+                    Button { presentedCall = .voice } label: {
+                        Label("Call", systemImage: "phone")
+                    }
+                    Button { presentedCall = .video } label: {
+                        Label("Video", systemImage: "video")
+                    }
+                    Spacer()
+                }
+                .buttonStyle(RetroButtonStyle())
+                .padding(10)
                 NostalgicConversation(chat: liveChat, messageText: $messageText, send: sendMessage)
             } else {
                 // Header
@@ -49,16 +61,18 @@ struct ChatView: View {
                     Spacer()
 
                     HStack(spacing: 20) {
-                        Button(action: {}) {
+                        Button(action: { presentedCall = .voice }) {
                             Image(systemName: "phone")
                                 .font(.title3)
                                 .foregroundColor(theme.secondaryTextColor)
                         }
-                        Button(action: {}) {
+                        .accessibilityLabel("Call \(chat.partner.name)")
+                        Button(action: { presentedCall = .video }) {
                             Image(systemName: "video")
                                 .font(.title3)
                                 .foregroundColor(theme.secondaryTextColor)
                         }
+                        .accessibilityLabel("Video call \(chat.partner.name)")
                     }
                 }
                 .padding(.horizontal)
@@ -151,6 +165,9 @@ struct ChatView: View {
         }
         .background(theme.backgroundColor.ignoresSafeArea())
         .navigationBarHidden(true)
+        .fullScreenCover(item: $presentedCall) { kind in
+            CallView(partner: liveChat.partner, kind: kind)
+        }
         .animation(.easeInOut(duration: 0.3), value: theme.activeMode)
         .onAppear {
             store.openChatId = chat.id
