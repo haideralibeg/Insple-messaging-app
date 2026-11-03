@@ -13,6 +13,15 @@ enum LocalDevelopment {
         #endif
     }
 
+    // Simulators share the Mac's loopback; physical devices use its Wi-Fi address.
+    static var emulatorHost: String {
+        #if targetEnvironment(simulator)
+        "127.0.0.1"
+        #else
+        Bundle.main.object(forInfoDictionaryKey: "TalkrEmulatorHost") as? String ?? "127.0.0.1"
+        #endif
+    }
+
     static func configureFirebase() {
         guard FirebaseApp.app() == nil else { return }
         if usesEmulators {
@@ -24,14 +33,14 @@ enum LocalDevelopment {
             options.apiKey = "AIza00000000000000000000000000000000000"
             options.projectID = "demo-talkr"
             FirebaseApp.configure(options: options)
-            Auth.auth().useEmulator(withHost: "127.0.0.1", port: 9099)
+            Auth.auth().useEmulator(withHost: emulatorHost, port: 9099)
             Auth.auth().settings?.isAppVerificationDisabledForTesting = true
             let database = Firestore.firestore()
             let settings = database.settings
-            settings.host = "127.0.0.1:8080"
+            settings.host = "\(emulatorHost):8080"
             settings.isSSLEnabled = false
             database.settings = settings
-            Functions.functions().useEmulator(withHost: "127.0.0.1", port: 5001)
+            Functions.functions().useEmulator(withHost: emulatorHost, port: 5001)
         } else {
             FirebaseApp.configure()
         }

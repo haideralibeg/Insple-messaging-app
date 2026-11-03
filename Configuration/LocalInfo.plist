@@ -11,6 +11,15 @@
 			</array>
 		</dict>
 	</array>
+	<key>TalkrEmulatorHost</key>
+	<string>10.0.0.15</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Talkr Local connects to the test services running on your Mac.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>TalkrUseEmulators</key>
 	<true/>
 	<key>UIBackgroundModes</key>

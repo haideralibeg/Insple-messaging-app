@@ -34,3 +34,20 @@ selected mode is saved to the user profile; the sound setting is device-local.
 - Turn sounds off, then test with the phone's Silent Mode enabled.
 - Sign out and back in; confirm the selected mode is restored.
 - Check a long message, multiline draft, large text size, and an empty buddy list.
+
+### Xcode previews
+
+Open an interface file in `Talkr` and choose **Editor → Canvas**, then resume
+its preview. Named previews cover onboarding, the inbox (including an empty
+state), contacts, conversations, and shared components in both visual modes.
+Use the canvas's live mode to try navigation, theme switching, and sending
+sample messages without opening the Simulator app.
+
+Previews are compiled only in **Debug**. If you switched to profiling, use
+**Product → Scheme → Edit Scheme → Run → Info → Build Configuration → Debug**
+for the canvas, then resume it. Keep the **Profile** action on **Release** for
+performance measurements.
+
+`PreviewSupport.swift` supplies independent, in-memory sample data for each
+canvas. Preview services skip Firebase authentication, reads, and writes;
+normal app launches continue to use Firebase.

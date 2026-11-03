@@ -302,6 +302,7 @@
 				CODE_SIGN_ENTITLEMENTS = Configuration/Talkr.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H8Z7B45KCV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Configuration/Info.plist;
@@ -339,6 +340,7 @@
 				CODE_SIGN_ENTITLEMENTS = Configuration/Talkr.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H8Z7B45KCV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Configuration/Info.plist;
@@ -435,13 +437,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = Configuration/Talkr.entitlements;
+				CODE_SIGN_ENTITLEMENTS = "";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H8Z7B45KCV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Configuration/LocalInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Talkr Local";
+				INFOPLIST_KEY_CFBundleDisplayName = Talkr;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Talkr uses your camera for video calls.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talkr uses your microphone for voice and video calls.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

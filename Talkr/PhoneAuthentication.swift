@@ -90,7 +90,7 @@ final class PhoneAuthentication {
     func fillLocalCode() async {
         #if DEBUG
         guard LocalDevelopment.usesEmulators, !isLoading, let verificationID else { return }
-        guard let url = URL(string: "http://127.0.0.1:9099/emulator/v1/projects/demo-talkr/verificationCodes") else { return }
+        guard let url = URL(string: "http://\(LocalDevelopment.emulatorHost):9099/emulator/v1/projects/demo-talkr/verificationCodes") else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -132,8 +132,7 @@ struct PhoneAuthenticationView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                Text("Talkr")
-                    .font(.system(size: 36, weight: .bold))
+                OnboardingLogo()
                 Text(linking ? "Add a phone number" : "Stay connected your way")
                     .foregroundStyle(.secondary)
                 if LocalDevelopment.usesEmulators {

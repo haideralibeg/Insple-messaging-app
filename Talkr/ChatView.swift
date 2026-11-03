@@ -6,6 +6,7 @@ struct ChatView: View {
     @EnvironmentObject var theme: ThemeManager
     var chat: Chat
     @State private var messageText = ""
+    @FocusState private var isComposerFocused: Bool
     @State private var isShowingSchedule = false
     @Environment(ScheduledMessageStore.self) private var scheduled
 
@@ -26,13 +27,13 @@ struct ChatView: View {
                     }
                     .buttonStyle(RetroButtonStyle())
                     Spacer()
-                    CallButtons(partner: chat.partner)
+                    CallButtons(partner: chat.partner, beforeCall: { isComposerFocused = false })
                 }
                 .padding(.horizontal, 10).padding(.top, 8)
             }
             TopThemeBar()
             if theme.isNostalgic {
-                NostalgicConversation(chat: liveChat, messageText: $messageText, send: sendMessage,
+                NostalgicConversation(chat: liveChat, messageText: $messageText, composerFocus: $isComposerFocused, send: sendMessage,
                     pendingMessages: pendingMessages, schedule: { isShowingSchedule = true },
                     cancelScheduled: { message in Task { await scheduled.cancel(message) } })
             } else {
@@ -57,7 +58,7 @@ struct ChatView: View {
 
                     Spacer()
 
-                    CallButtons(partner: chat.partner)
+                    CallButtons(partner: chat.partner, beforeCall: { isComposerFocused = false })
                 }
                 .padding(.horizontal)
                 .padding(.top, 10)
@@ -126,6 +127,7 @@ struct ChatView: View {
                         }
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .background(theme.backgroundColor)
 
                 // Input bar
@@ -140,6 +142,7 @@ struct ChatView: View {
                     }
                     HStack {
                         TextField("Message...", text: $messageText)
+                            .focused($isComposerFocused)
                             .foregroundColor(theme.secondaryTextColor)
                             .onSubmit { sendMessage() }
                     }
@@ -210,3 +213,14 @@ struct ChatView: View {
         messageText = ""
     }
 }
+
+#if DEBUG
+#Preview("Chat — Gen Z") {
+    PreviewHost { _ in ChatView(chat: PreviewData.chats[0]) }
+}
+
+#Preview("Chat — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in ChatView(chat: PreviewData.chats[0]) }
+}
+
+#endif

@@ -14,7 +14,7 @@ No commits, pushes, GitHub changes, cloud deployments, or live service configura
 - **Scheduled messages:** Gen Z has a clock button; Nostalgic has Send later. See [SCHEDULED-MESSAGING.md](SCHEDULED-MESSAGING.md) for local setup, tests, and delivery limits. The local scheduler must also be running.
 
 - **Phone sign-in:** The opening screen now asks for a number with a country code. Firebase sends a verification code and checks the code before signing the person in. The local emulator prints a test code instead of sending an SMS.
-- **Existing accounts:** Email sign-in remains available. An existing user can sign in with email, press and hold their profile circle, and choose “Add phone number.” This adds phone sign-in to the same account, keeping its messages and theme. Signing in with a new number first would create a separate account.
+- **Existing accounts:** Email sign-in remains available. An existing user can sign in with email, open their profile circle, and choose “Add phone number.” This adds phone sign-in to the same account, keeping its messages and theme. Signing in with a new number first would create a separate account.
 - **Resending codes:** A 60-second cooldown prevents repeatedly tapping the resend button. Wrong codes and connection problems are shown on the screen.
 - **Voice and video buttons:** The phone and camera buttons are connected in both themes. Stream handles the audio/video connection; Firebase remains responsible for accounts and text messages.
 - **Incoming calls:** The app integration uses Stream's CallKit support. Apple shows the system incoming-call screen. Background incoming calls need Apple push credentials configured with Stream and should be tested on real devices.
@@ -171,3 +171,37 @@ Xcode is set to **Talkr Local**. Emulator services are running. Use fake numbers
 ### Verification after the simulator login fix
 
 The latest Talkr Local build was installed on both simulators. On the first, Test account 1 → Send verification code → Fill test code → Verify successfully signed Alice Test in and opened the inbox. The app stayed in the local build throughout. The second simulator is left at the local login screen, ready for Test account 2. Device-control sessions have ended. If Xcode stopped the first app while installing the second, reopen Talkr Local from its Home screen. No GitHub changes were made.
+
+## If local real-time messaging stops working
+
+On October 25, the local Firebase services were stopped; the previous database log showed a clean shutdown after the October 18 session. Talkr Local cannot deliver messages between simulators without those services. Opening Xcode or the simulator does not start them.
+
+From the project folder, run `cd backend` and then `npm start`. Wait for “All emulators ready.” For scheduled messages, run `npm run scheduler` in a second terminal in backend. Keep both processes running during testing. You can check service availability by opening http://127.0.0.1:4000 in a browser.
+
+Use Talkr Local on both simulators. If the emulators have restarted without a saved data export, old test accounts and conversations may no longer exist on the server. Sign out and use Test account 1 / Test account 2 to sign in again, then open the other account from Contacts to start a new conversation. Simulator-cached messages alone do not prove the local server is online.
+
+Recovery verification on October 25: all three backend tests passed. Both simulators signed out and back in with the local helpers. Alice sent from Gen Z; Bob’s inbox updated immediately with an unread dot. Bob opened the conversation, switched to Nostalgic, and replied; Alice received it immediately and the earlier message showed seen. Both installed apps ran simultaneously. No app-code changes or reinstall were needed. Local services and the scheduler were left running.
+
+November 2 navigation update: tap the profile circle to open My profile. Sign out is now inside that screen (with confirmation). Add phone number is there too. Photo selection and privacy controls imported from main are previews only; theme selection and sign-out remain connected.
+
+## November 2 calling check
+
+The saved API key and secret are valid. With both Talkr Local apps open and signed in as Alice and Bob, open their chat and tap the phone or camera button. If an app was opened before the credentials were saved, use Retry once to reconnect. Accept on the other simulator. Ringing, answering, and joining were verified in both directions; use two real devices to confirm audible sound and camera video.
+
+Keep testing with the two known accounts for now. Stream's default call permissions still need restriction to invited members before wider testing. Background notifications are not configured. No GitHub push or billing change was made.
+
+Final hang-up retest passed in both directions: after an answered two-person call, the caller hung up and the other simulator returned to chat within three seconds. The final Xcode build and whitespace check passed.
+
+Personal-team device signing: Talkr Local no longer requests the APNs entitlement, and local calling skips incoming push registration. This permits foreground call testing without paid push capability; keep both apps open. Live build entitlements remain unchanged. Physical-device networking still needs configuration.
+
+## Physical iPhone connection — November 2
+
+Fixed the phone login network error: simulators keep using 127.0.0.1, while physical Talkr Local builds read TalkrEmulatorHost from Configuration/LocalInfo.plist (currently 10.0.0.15). Authentication, Firestore, Functions and Fill test code all use this address. Added the local-network permission explanation and local HTTP allowance only to the local plist. The iPhone build passed.
+
+A temporary TCP bridge on this Mac forwards Wi-Fi ports 9099, 8080 and 5001 to the existing loopback emulators, preserving accounts/messages without restarting them. This bridge must remain running for phone testing; it is not a deployed backend or a permanent startup service. If the Mac's Wi-Fi address changes, update TalkrEmulatorHost and restart the bridge. Use a trusted Wi-Fi network shared by the phone and Mac. No router port forwarding is needed. Emulator services are development-only and have no production authentication protection.
+
+Run Talkr Local again on the iPhone to install these changes, allow Local Network access, choose Test account 1, then Send verification code → Fill test code → Verify. Use Test account 2 on the simulator. No real SMS is sent. Phone-side reachability and permissions must still be confirmed by the user; Mac-side checks can only verify the bridge itself.
+
+## Chat keyboard fix — November 2
+
+User confirmed voice and video work with their real iPhone and Mac. Both Gen Z and Nostalgic message lists now support dragging to dismiss the keyboard. Both composers share explicit SwiftUI focus state, which the phone/video buttons clear before starting a call. Draft text is preserved. The iPhone build passed; swipe and call-transition behavior still needs a hands-on check on the updated phone app. No push or commit was made.

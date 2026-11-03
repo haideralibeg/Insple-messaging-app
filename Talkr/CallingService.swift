@@ -51,9 +51,14 @@ final class CallingService {
             connectedUserID = userID
             // Start incoming calls with the camera off until the recipient explicitly enables it.
             viewModel = CallViewModel(callSettings: CallSettings(audioOn: true, videoOn: false))
+            // Close a direct call after the other participant hangs up.
+            viewModel?.participantAutoLeavePolicy = LastParticipantAutoLeavePolicy()
             callKitAdapter.callSettings = CallSettings(audioOn: true, videoOn: false)
             callKitAdapter.streamVideo = video
-            callKitAdapter.registerForIncomingCalls()
+            // Local testing uses foreground ringing without an APNs entitlement.
+            if !LocalDevelopment.usesEmulators {
+                callKitAdapter.registerForIncomingCalls()
+            }
             tokenObservation = Task { [weak self] in
                 guard let self else { return }
                 for await token in self.pushAdapter.$deviceToken.values {
@@ -139,16 +144,23 @@ struct TalkrCallOverlay: View {
 
 struct CallButtons: View {
     let partner: User
+    let beforeCall: () -> Void
     @Environment(CallingService.self) private var calling
     @EnvironmentObject private var theme: ThemeManager
 
     var body: some View {
         HStack(spacing: 20) {
-            Button { calling.startCall(to: partner, video: false) } label: {
+            Button {
+                beforeCall()
+                calling.startCall(to: partner, video: false)
+            } label: {
                 Image(systemName: "phone")
             }
             .accessibilityLabel("Voice call \(partner.name)")
-            Button { calling.startCall(to: partner, video: true) } label: {
+            Button {
+                beforeCall()
+                calling.startCall(to: partner, video: true)
+            } label: {
                 Image(systemName: "video")
             }
             .accessibilityLabel("Video call \(partner.name)")

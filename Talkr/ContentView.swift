@@ -1,6 +1,12 @@
 import SwiftUI
 
+enum Route: Hashable {
+    case contacts
+    case chat(Chat)
+}
+
 struct ContentView: View {
+    @State private var path: [Route] = []
     @EnvironmentObject var auth: AuthService
     @State private var calling = CallingService()
     @State private var scheduled = ScheduledMessageStore()
@@ -9,8 +15,14 @@ struct ContentView: View {
     var body: some View {
         Group {
             if auth.isAuthenticated {
-                NavigationStack {
-                    InboxView()
+                NavigationStack(path: $path) {
+                    InboxView(path: $path)
+                        .navigationDestination(for: Route.self) { route in
+                            switch route {
+                            case .contacts: ContactsView(path: $path)
+                            case .chat(let chat): ChatView(chat: chat)
+                            }
+                        }
                 }
             } else {
                 // The $ creates a perfect 2-way connection to the Auth manager!
@@ -25,6 +37,8 @@ struct ContentView: View {
             }
         }
         .task(id: auth.currentUser?.id) {
+            guard !auth.isPreview else { return }
+            path = []
             store.observeInbox(userID: auth.currentUser?.id)
             scheduled.observe(userID: auth.currentUser?.id)
             await calling.connect(userID: auth.currentUser?.id, name: auth.currentUser?.name ?? "Talkr user")
@@ -44,3 +58,18 @@ struct ContentView: View {
         .animation(.easeInOut, value: auth.isAuthenticated)
     }
 }
+
+#if DEBUG
+#Preview("App — Gen Z") {
+    PreviewHost { _ in ContentView() }
+}
+
+#Preview("App — Nostalgic") {
+    PreviewHost(mode: "nostalgic") { _ in ContentView() }
+}
+
+#Preview("App — Signed Out") {
+    PreviewHost(authenticated: false) { _ in ContentView() }
+}
+
+#endif

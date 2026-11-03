@@ -87,7 +87,12 @@ class ChatStore: ObservableObject {
     @Published var chats: [Chat] = []
     @Published var contacts: [User] = []
 
-    private let db = Firestore.firestore()
+    private lazy var db = Firestore.firestore()
+    let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+    }
     private var activeListener: ListenerRegistration?
     private var listeningTask: Task<Void, Never>?
     private var activeChatID: String?
@@ -96,6 +101,7 @@ class ChatStore: ObservableObject {
     @Published var errorMessage: String?
 
     func observeInbox(userID: String?) {
+        guard !isPreview else { return }
         inboxListener?.remove()
         contactsListener?.remove()
         stopListening()
@@ -135,6 +141,7 @@ class ChatStore: ObservableObject {
     }
 
     func fetchContacts() {
+        guard !isPreview else { return }
         contactsListener?.remove()
         contactsListener = db.collection("users").addSnapshotListener { snapshot, error in
             guard let docs = snapshot?.documents else { return }
@@ -147,7 +154,7 @@ class ChatStore: ObservableObject {
     }
 
     func getOrCreateChat(with partner: User) -> Chat {
-        let currentUserId = Auth.auth().currentUser?.uid ?? "me"
+        let currentUserId = isPreview ? "preview-me" : (Auth.auth().currentUser?.uid ?? "me")
         let roomId = [currentUserId, partner.id].sorted().joined(separator: "_")
 
         if let existing = chats.first(where: { $0.id == roomId }) {
@@ -160,6 +167,7 @@ class ChatStore: ObservableObject {
     }
 
     func markAsRead(_ chat: Chat) {
+        guard !isPreview else { return }
         if let idx = chats.firstIndex(where: { $0.id == chat.id }), chats[idx].isUnread {
             chats[idx].isUnread = false
             if let userID = Auth.auth().currentUser?.uid {
@@ -170,6 +178,7 @@ class ChatStore: ObservableObject {
     }
 
     func startListening(to chat: Chat) {
+        guard !isPreview else { return }
         stopListening()
         guard let userID = Auth.auth().currentUser?.uid else { return }
         activeChatID = chat.id
@@ -233,6 +242,7 @@ class ChatStore: ObservableObject {
     }
 
     func sendMessage(_ text: String, in chat: Chat) {
+        guard !isPreview else { return }
         guard let currentUserId = Auth.auth().currentUser?.uid else { return }
         let msg = ChatMessage(id: UUID().uuidString, senderId: currentUserId, content: text, timestamp: Date(), isIncoming: false)
 
@@ -259,6 +269,7 @@ class ChatStore: ObservableObject {
     }
     
     func markMessagesAsRead(in chat: Chat) {
+        guard !isPreview else { return }
         let currentUserId = Auth.auth().currentUser?.uid ?? ""
         let unread = chat.messages.filter { $0.senderId != currentUserId && !$0.isRead }
         guard !unread.isEmpty else { return }
@@ -285,7 +296,11 @@ final class ThemeManager: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    private init() {
+    private let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+        guard !isPreview else { return }
         AuthService.shared.$currentUser
             .compactMap { $0?.activeMode }
             .receive(on: RunLoop.main)
@@ -296,12 +311,12 @@ final class ThemeManager: ObservableObject {
     func toggle() {
         let next = activeMode == "genz" ? "nostalgic" : "genz"
         activeMode = next
-        AuthService.shared.updateMode(next)
+        if !isPreview { AuthService.shared.updateMode(next) }
     }
 
     func set(_ mode: String) {
         activeMode = mode
-        AuthService.shared.updateMode(mode)
+        if !isPreview { AuthService.shared.updateMode(mode) }
     }
 
     var isNostalgic: Bool { activeMode == "nostalgic" }
@@ -347,6 +362,7 @@ class AuthService: ObservableObject {
     static let shared = AuthService()  // singleton for ThemeManager access
     // Session state
     @Published var currentUser: User? = nil
+    @Published private(set) var accountEmail: String?
     @Published var isAuthenticated: Bool = false
 
     // Onboarding state
@@ -360,7 +376,11 @@ class AuthService: ObservableObject {
 
     var isCompletingPhoneSignIn = false
 
-    init() {
+    let isPreview: Bool
+
+    init(isPreview: Bool = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1") {
+        self.isPreview = isPreview
+        guard !isPreview else { return }
         authListener = Auth.auth().addStateDidChangeListener { [weak self] _, _ in
             Task { @MainActor in
                 guard let self, !self.isCompletingPhoneSignIn else { return }
@@ -370,6 +390,8 @@ class AuthService: ObservableObject {
     }
 
     func refreshSession() async {
+        guard !isPreview else { return }
+        accountEmail = Auth.auth().currentUser?.email
         guard let user = Auth.auth().currentUser else {
             currentUser = nil
             isAuthenticated = false
@@ -410,6 +432,7 @@ class AuthService: ObservableObject {
 
     // MARK: Login
     func login(email: String, password: String) async {
+        if isPreview { isAuthenticated = true; return }
         await MainActor.run { isLoading = true; errorMessage = nil }
         defer { Task { await MainActor.run { self.isLoading = false } } }
         do {
@@ -435,6 +458,7 @@ class AuthService: ObservableObject {
 
     // MARK: Sign-up Step 3 — Create account + send verification email
     func signUpCreateAccount(password: String, confirmPassword: String) async {
+        if isPreview { isAuthenticated = true; return }
         guard password == confirmPassword else {
             await MainActor.run { errorMessage = "Passwords do not match." }
             return
@@ -455,12 +479,14 @@ class AuthService: ObservableObject {
 
     // MARK: Logout
     func logout() {
+        if isPreview { currentUser = nil; isAuthenticated = false; screen = .login; return }
         try? Auth.auth().signOut()
         screen = .login
     }
 
     // MARK: Update theme mode
     func updateMode(_ mode: String) {
+        guard !isPreview else { return }
         guard let uid = currentUser?.id else { return }
         currentUser?.activeMode = mode
         Firestore.firestore().collection("users").document(uid).updateData(["activeMode": mode])

@@ -35,6 +35,7 @@ struct RetroButtonStyle: ButtonStyle {
 struct NostalgicConversation: View {
     @EnvironmentObject private var auth: AuthService
     @Binding var messageText: String
+    let composerFocus: FocusState<Bool>.Binding
     let chat: Chat
     let send: () -> Void
     let pendingMessages: [ScheduledMessage]
@@ -42,11 +43,12 @@ struct NostalgicConversation: View {
     let cancelScheduled: (ScheduledMessage) -> Void
     @AppStorage("nostalgicSoundsEnabled") private var soundsEnabled = true
 
-    init(chat: Chat, messageText: Binding<String>, send: @escaping () -> Void,
+    init(chat: Chat, messageText: Binding<String>, composerFocus: FocusState<Bool>.Binding, send: @escaping () -> Void,
          pendingMessages: [ScheduledMessage], schedule: @escaping () -> Void,
          cancelScheduled: @escaping (ScheduledMessage) -> Void) {
         self.chat = chat
         self._messageText = messageText
+        self.composerFocus = composerFocus
         self.send = send
         self.pendingMessages = pendingMessages
         self.schedule = schedule
@@ -117,6 +119,7 @@ struct NostalgicConversation: View {
                     .font(.system(.subheadline, design: .monospaced))
                     .padding(14)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .background(Color.white)
                 .modifier(RetroPanel(inset: true))
                 .onAppear { scrollToLatest(proxy) }
@@ -137,6 +140,7 @@ struct NostalgicConversation: View {
                     }
                 }
                 TextField("Type a message…", text: $messageText, axis: .vertical)
+                    .focused(composerFocus)
                     .lineLimit(2...5)
                     .font(.system(.body, design: .monospaced))
                     .padding(10)
